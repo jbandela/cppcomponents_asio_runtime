@@ -1,6 +1,7 @@
 #include <cppcomponents/cppcomponents.hpp>
 #include <cppcomponents/future.hpp>
 #include <cppcomponents/buffer.hpp>
+#include <cppcomponents/channel.hpp>
 
 namespace cppcomponents{
   namespace asio_runtime{
@@ -283,6 +284,13 @@ namespace cppcomponents{
 
       CPPCOMPONENTS_CONSTRUCT(ITimer, Wait, Cancel, CancelOne, ExpiresFromNowRaw);
 
+      CPPCOMPONENTS_INTERFACE_EXTRAS(ITimer){
+        template<class Duration>
+        void ExpiresFromNow(Duration d){
+          this->get_interface().ExpiresFromNowRaw(std::chrono::duration_cast<std::chrono::microseconds>(d).count());
+        }
+      };
+      
     };
 
     struct ITimerStatics :define_interface<cppcomponents::uuid<0xb9618857, 0x9b3e, 0x452e, 0x92c4, 0x352f9e0334e8>>
@@ -292,10 +300,10 @@ namespace cppcomponents{
 
       CPPCOMPONENTS_CONSTRUCT(ITimerStatics, WaitForRaw);
 
-      CPPCOMPONENTS_INTERFACE_EXTRAS(ITimerStatics){
+      CPPCOMPONENTS_STATIC_INTERFACE_EXTRAS(ITimerStatics){
         template<class Duration>
-        Future<void> WaitFor(Duration d){
-          return this->get_interface().WaitForRaw(std::chrono::duration_cast<std::chrono::microseconds>(d).count());
+        static Future<void> WaitFor(Duration d){
+          return Class::WaitForRaw(std::chrono::duration_cast<std::chrono::microseconds>(d).count());
         }
       };
     };
@@ -304,6 +312,30 @@ namespace cppcomponents{
 
     typedef runtime_class<TimerId, object_interfaces<ITimer>, static_interfaces<ITimerStatics>> Timer_t;
     typedef use_runtime_class<Timer_t> Timer;
+
+    struct IAcceptor :define_interface<cppcomponents::uuid<0x6269086f, 0xaaa7, 0x4ea5, 0xa65c, 0xbbf0b8394ffe>>
+    {
+      Future<IAsyncStream> Accept();
+
+      CPPCOMPONENTS_CONSTRUCT(IAcceptor, Accept);
+    };
+
+    struct IAcceptorCreator :define_interface<cppcomponents::uuid<0x0f2f5f06, 0xabbd, 0x4a76, 0xb054, 0x5cdab96ea8f4>>
+    {
+      use<InterfaceUnknown> Create(endpoint e, bool reuse_addr);
+
+      CPPCOMPONENTS_CONSTRUCT(IAcceptorCreator, Create);
+
+      CPPCOMPONENTS_INTERFACE_EXTRAS(IAcceptorCreator){
+        use<InterfaceUnknown> TemplatedConstructor(endpoint e, bool reuse_address = true){
+          return this->get_interface().Create(e, reuse_addr);
+        }
+      };
+    };
+
+    inline std::string AcceptorId(){ return "cppcomponents_asio_dll!Acceptor"; }
+    typedef runtime_class<AcceptorId, object_interfaces<IAcceptor>, factory_interface<IAcceptorCreator>> Acceptor_t;
+    typedef use_runtime_class<Acceptor_t> Acceptor;
 
     inline std::string TcpId(){ return "cppcomponents_asio_dll!Tcp"; }
     inline std::string UdpId(){ return "cppcomponents_asio_dll!Udp"; }
