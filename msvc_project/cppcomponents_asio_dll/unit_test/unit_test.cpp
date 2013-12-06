@@ -21,7 +21,9 @@ void main_async(int i, cppcomponents::awaiter await){
   await(socket.Write(const_simple_buffer(&request[0], request.size())));
   while (true){
    
-    auto buf = await(socket.ReadBuffer());
+    auto fut = await.as_future(socket.ReadBuffer());
+    if (fut.ErrorCode()){ break; }
+    auto buf = fut.Get();
     std::string str{ buf.Begin(), buf.End() };
     std::cout << str;
   }
@@ -37,5 +39,7 @@ int main(){
   });
 
   std::cin >> i;
+
+  cppcomponents::asio_runtime::Runtime::GetThreadPool().Join();
 
 }
