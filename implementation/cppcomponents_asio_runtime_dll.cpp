@@ -1,6 +1,6 @@
 #include "../cppcomponents_asio_runtime/cppcomponents_asio_runtime.hpp"
 #define ASIO_STANDALONE 1
-#include "../cppcomponents_asio_runtime/external_dependencies/asio.hpp"
+#include "external_dependencies/asio.hpp"
 #include <cppcomponents/implementation/spinlock.hpp>
 
 using namespace cppcomponents;
