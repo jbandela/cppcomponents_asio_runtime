@@ -6,7 +6,7 @@
 void main_async(int i, cppcomponents::awaiter await){
   using namespace cppcomponents;
   using namespace asio_runtime;
-  Runtime::GetThreadPool();
+  Runtime::GetThreadPool(1);
   //auto start = std::chrono::steady_clock::now();
   //auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ i }));
   //auto end = std::chrono::steady_clock::now();
