@@ -6,45 +6,72 @@
 namespace cppcomponents{
   namespace asio_runtime{
 
+ 
+
 #pragma pack(push, 1)
-    struct simple_buffer{
-      char* data_;
+    template<class Char = char>
+    struct basic_simple_buffer{
+      typedef typename std::make_unsigned<Char>::type UChar;
+      Char* data_;
       std::size_t len_;
 
-      simple_buffer(std::vector<char>& v)
+      basic_simple_buffer(std::vector<Char>& v)
         :data_{ v.size() ? &v[0] : nullptr },
         len_{ v.size() }
 
       {
       }
-      template<int size>
-      simple_buffer(char(&ar)[size])
+      template<int sz>
+      basic_simple_buffer(Char(&ar)[sz])
+        : data_{ &ar[0] },
+        len_{ sz }
+      {}
+      template<int sz>
+      basic_simple_buffer(UChar(&ar)[sz])
+        : data_{ reinterpret_cast<Char*>(&ar[0]) },
+        len_{ sz }
+      {}
+      template<int sz>
+      basic_simple_buffer(std::array<Char, sz>&ar)
         : data_{ &ar[0] },
         len_{ size }
       {}
+      template<int sz>
+      basic_simple_buffer(std::array<UChar, sz>&ar)
+        : data_{ reinterpret_cast<Char*>(&ar[0]) },
+        len_{ sz }
+      {}
 
-      char* begin(){ return data_; }
-      char* end(){ return begin() + len_; }
+      basic_simple_buffer(Char* d, std::size_t sz) :data_{ d }, len_{ sz }{}
+      basic_simple_buffer(UChar* d, std::size_t sz) :data_{ reinterpret_cast<Char*>(d) }, len_{ sz }{}
+
+      Char* begin(){ return data_; }
+      Char* end(){ return begin() + len_; }
+      const Char* cbegin(){ return data_; }
+      const Char* cend(){ return begin() + len_; }
       std::size_t size(){ return len_; }
-      char* data(){ return data_; }
+      Char* data(){ return data_; }
 
 
 
     };
 #pragma pack(pop)
 
+    typedef basic_simple_buffer<char> simple_buffer;
+
+    typedef basic_simple_buffer<const char> const_simple_buffer;
   }
 }
 
 namespace cross_compiler_interface{
 
-  template<>
-  struct cross_conversion<cppcomponents::asio_runtime::simple_buffer>
-    :trivial_conversion<cppcomponents::asio_runtime::simple_buffer>{};
-  template<>
-  struct type_name_getter<cppcomponents::asio_runtime::simple_buffer>
+  template<class Char>
+  struct cross_conversion<cppcomponents::asio_runtime::basic_simple_buffer<Char>>
+    :trivial_conversion<cppcomponents::asio_runtime::basic_simple_buffer<Char>>{};
+  template<class Char>
+  struct type_name_getter<cppcomponents::asio_runtime::basic_simple_buffer<Char>>
   {
-    static std::string get_type_name(){ return "cppcomponents::asio_runtime::simple_buffer"; }
+    static std::string get_type_name(){ return "cppcomponents::asio_runtime::basic_simple_buffer"; }
   };
 
 }
@@ -119,21 +146,17 @@ namespace cppcomponents{
     struct IAsyncStream :define_interface<cppcomponents::uuid<0x891a8183, 0xe68d, 0x4265, 0xa108, 0x6b4e0519d254>>{
       Future<std::size_t> Read(simple_buffer buf);
       Future<std::size_t> ReadAt(std::uint64_t offset, simple_buffer buf);
-      Future<std::size_t> ReadUntilChar(simple_buffer buf, char c);
-      Future<std::size_t> ReadUntilString(simple_buffer buf, cr_string delim);
-      Future<std::size_t> ReadUntilRegex(simple_buffer buf, cr_string reg);
 
-      Future<IBuffer> ReadBuffer();
-      Future<IBuffer> ReadBufferAt(std::uint64_t offset);
-      Future<IBuffer> ReadBufferUntilChar(char c);
-      Future<IBuffer> ReadBufferUntilString(cr_string delim);
-      Future<IBuffer> ReadBufferUntilRegex(cr_string reg);
+      Future<use<IBuffer>> ReadBuffer();
+      Future<use<IBuffer>> ReadBufferAt(std::uint64_t offset);
+      Future<use<IBuffer>> ReadBufferUntilChar(char c);
+      Future<use<IBuffer>> ReadBufferUntilString(cr_string delim);
 
-      Future<std::size_t> Write(cr_string data);
-      Future<std::size_t> WriteAt(std::uint64_t offset, cr_string data);
+      Future<std::size_t> Write(const_simple_buffer data);
+      Future<std::size_t> WriteAt(std::uint64_t offset, const_simple_buffer data);
 
-      CPPCOMPONENTS_CONSTRUCT(IAsyncStream, Read, ReadAt, ReadUntilChar, ReadUntilString, ReadUntilRegex,
-        ReadBuffer, ReadBufferAt, ReadBufferUntilChar, ReadBufferUntilString, ReadBufferUntilRegex);
+      CPPCOMPONENTS_CONSTRUCT(IAsyncStream, Read, ReadAt, 
+        ReadBuffer, ReadBufferAt, ReadBufferUntilChar, ReadBufferUntilString,Write,WriteAt);
 
     };
 
@@ -151,16 +174,16 @@ namespace cppcomponents{
 
     struct IIPAddressStatic :define_interface<cppcomponents::uuid<0xa4969be1, 0xb3cb, 0x41b3, 0xacea, 0x2074dbe8dfde>>{
       use<IIPAddress> V4FromString(cr_string str);
-      use<IIPAddress> V4FromBytes(cr_string bytes);
+      use<IIPAddress> V4FromBytes(simple_buffer bytes);
       use<IIPAddress> V4Broadcast();
       use<IIPAddress> V4Loopback();
       use<IIPAddress> V4Any();
 
       use<IIPAddress> V6FromString(cr_string str);
-      use<IIPAddress> V6FromBytes(cr_string bytes);
+      use<IIPAddress> V6FromBytes(simple_buffer bytes);
       use<IIPAddress> V6Loopback();
       use<IIPAddress> V6Any();
-      use<IIPAddress> V6V4Compatible();
+      use<IIPAddress> V6V4Compatible(use<IIPAddress> v4);
 
       CPPCOMPONENTS_CONSTRUCT(IIPAddressStatic, V4FromString, V4FromBytes, V4Broadcast, V4Loopback, V4Any,
         V6FromString, V6FromBytes, V6Loopback, V6Any, V6V4Compatible);
@@ -225,10 +248,12 @@ namespace cppcomponents{
   namespace asio_runtime{
     struct IAsyncDatagram :define_interface<cppcomponents::uuid<0x5e1f8df2, 0x3485, 0x416a, 0x8024, 0x9f18f7ecad02>>
     {
-      Future<IBuffer> ReceiveRaw(std::uint32_t flags);
-      Future<IBuffer> ReceiveFromRaw(endpoint sender, std::uint32_t flags);
-      void SendRaw(simple_buffer buffer, std::uint32_t flags);
-      void SendToRaw(simple_buffer buffer, endpoint receiver, std::uint32_t flags);
+      Future<void> ReceiveRaw(simple_buffer buf, std::uint32_t flags);
+      Future<void> ReceiveFromRaw(simple_buffer buf, endpoint sender, std::uint32_t flags);
+      Future<use<IBuffer>> ReceiveBufferRaw(std::uint32_t flags);
+      Future<use<IBuffer>> ReceiveFromBufferRaw(endpoint sender, std::uint32_t flags);
+      void SendRaw(const_simple_buffer buffer, std::uint32_t flags);
+      void SendToRaw(const_simple_buffer buffer, endpoint receiver, std::uint32_t flags);
 
       CPPCOMPONENTS_CONSTRUCT(IAsyncDatagram, ReceiveRaw, ReceiveFromRaw,
         SendRaw, SendToRaw);
@@ -246,7 +271,18 @@ namespace cppcomponents{
         Passive = 32,
         V4Mapped = 64
       };
-      void Assign(std::uint64_t);
+
+      enum{
+        IPV4 = 4,
+        IPV6 = 6
+      };
+
+      enum{
+        ShutdownBoth = 2,
+        ShutdownSend = 0,
+        ShutdownReceive = 1
+      };
+      void AssignRaw(std::int32_t ip_type,std::uint64_t);
       Future<void> Connect(endpoint e);
       Future<void> ConnectQueryRaw(cr_string host, cr_string service, std::uint32_t flags);
       bool AtMark();
@@ -254,24 +290,24 @@ namespace cppcomponents{
       void Bind(endpoint e);
       void Cancel();
       void Close();
-      void GetOptionRaw(int level, int option_name, void* option_value, std::size_t* option_len);
+      void GetOptionRaw(int level, int option_name, void* option_value, std::size_t option_len);
       void SetOptionRaw(int level, int option_name, const void* option_value, std::size_t option_len);
       bool IsOpen();
       int NativeHandle();
       bool GetNonBlocking();
-      bool SetNonBlocking();  
+      void SetNonBlocking(bool);
       bool GetNativeNonBlocking();
-      bool SetNativeNonBlocking();
-      void OpenRaw(int family, int type, int protocol);
+      void SetNativeNonBlocking(bool);
+      void OpenRaw(std::int32_t ip_type);
       endpoint RemoteEndpoint();
-      void Shutdown();
+      void Shutdown(std::int32_t type);
 
-      CPPCOMPONENTS_CONSTRUCT(ISocket,Assign, Connect, ConnectQueryRaw, AtMark,
-        Available, Bind, Cancel, Close,  GetOptionRaw, SetOptionRaw,
+      CPPCOMPONENTS_CONSTRUCT(ISocket, AssignRaw, Connect, ConnectQueryRaw, AtMark,
+        Available, Bind, Cancel, Close, GetOptionRaw, SetOptionRaw,
         IsOpen, NativeHandle, GetNonBlocking, SetNonBlocking, GetNativeNonBlocking,
         SetNativeNonBlocking, OpenRaw, RemoteEndpoint, Shutdown);
 
-      
+
 
     };
 
@@ -290,7 +326,7 @@ namespace cppcomponents{
           this->get_interface().ExpiresFromNowRaw(std::chrono::duration_cast<std::chrono::microseconds>(d).count());
         }
       };
-      
+
     };
 
     struct ITimerStatics :define_interface<cppcomponents::uuid<0xb9618857, 0x9b3e, 0x452e, 0x92c4, 0x352f9e0334e8>>
@@ -307,7 +343,7 @@ namespace cppcomponents{
         }
       };
     };
-    
+
     inline std::string TimerId(){ return "cppcomponents_asio_dll!Timer"; }
 
     typedef runtime_class<TimerId, object_interfaces<ITimer>, static_interfaces<ITimerStatics>> Timer_t;
@@ -346,12 +382,16 @@ namespace cppcomponents{
     typedef runtime_class<UdpId, object_interfaces<ISocket, IAsyncDatagram>> Udp_t;
     typedef use_runtime_class<Udp_t> Udp;
 
-	}
+  }
 
   template<>
   struct uuid_of<asio_runtime::simple_buffer>{
     typedef cppcomponents::uuid<0xa198811e, 0x199f, 0x4b4a, 0xbac0, 0x9b3944d566ad> uuid_type;
-  }; 
+  };
+  template<>
+  struct uuid_of<asio_runtime::const_simple_buffer>{
+    typedef cppcomponents::uuid<0x6d3336ce, 0x24e3, 0x4922, 0xad21, 0xfb56d19bbef0> uuid_type;
+  };
   template<>
   struct uuid_of<asio_runtime::endpoint>{
     typedef cppcomponents::uuid<0x6ac33669, 0x0ea0, 0x4380, 0x8d20, 0x51d479e56711> uuid_type;
