@@ -3,10 +3,28 @@
 #include <cppcomponents_async_coroutine_wrapper/cppcomponents_resumable_await.hpp>
 
 
+void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStream> is,
+  cppcomponents::awaiter await){
+
+  while (true){
+    std::vector<char>  vec(100);
+    auto fut = await.as_future(is.Read(vec));
+    if (fut.ErrorCode()){
+      auto e = fut.ErrorCode();
+    }
+    else{
+
+    }
+    auto buf = fut.Get();
+    std::string str{vec.begin(),vec.end()};
+    std::cout << str;
+  }
+}
+
 void main_async(int i, cppcomponents::awaiter await){
   using namespace cppcomponents;
   using namespace asio_runtime;
-  Runtime::GetThreadPool(1);
+  Runtime::GetThreadPool();
   //auto start = std::chrono::steady_clock::now();
   //auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ i }));
   //auto end = std::chrono::steady_clock::now();
@@ -28,6 +46,12 @@ void main_async(int i, cppcomponents::awaiter await){
     std::cout << str;
   }
 
+  TcpAcceptor acceptor{ endpoint{ IPAddress::V4Loopback(), 7777 } };
+
+  while (true){
+    auto is = await(acceptor.Accept());
+    cppcomponents::resumable(print_connection)(is);
+  }
 }
 
 int main(){

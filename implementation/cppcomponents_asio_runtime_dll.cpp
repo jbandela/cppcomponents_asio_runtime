@@ -170,6 +170,8 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
       num_threads = std::thread::hardware_concurrency();
       if (num_threads == 0) num_threads = min_threads;
     }
+    if (num_threads < min_threads_){ min_threads_ = num_threads; }
+    if (num_threads > max_threads_){ max_threads_ = num_threads; }
     initial_threads_ = num_threads;
     for (int i = 0; i < num_threads; ++i){
       std::unique_ptr<io_service_runner> ptr{ new io_service_runner{&io_service_, true } };
@@ -392,9 +394,9 @@ struct settable_option{
   }
 };
 
-typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream>> Tcp_t1;
+typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream,IGetImplementation>> Tcp_t1;
 
-struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t>{
+struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
   asio::ip::tcp::socket socket_;
   void AssignRaw(std::int32_t ip_type, std::uint64_t socket){
     if (ip_type == 4){
@@ -663,11 +665,58 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t>{
   }
 
 
-  ImplementTcp() :socket_{get_io()}{}
+  ImplementTcp() :socket_{ get_io() }{}
+  void* IGetImplementation_GetImplementationRaw(){
+    return this;
+  }
+  const void* IGetImplementation_GetImplementationConstRaw(){
+    return this;
+  }
+
+
+
 
 };
 
 CPPCOMPONENTS_REGISTER(ImplementTcp)
+
+ImplementTcp& get_tcp(use<InterfaceUnknown> i){
+  return i.QueryInterface<IGetImplementation>().GetImplementation<ImplementTcp>();
+}
+
+struct ImplementTcpAcceptor :implement_runtime_class<ImplementTcpAcceptor, TcpAcceptor_t>
+{
+  asio::ip::tcp::acceptor acceptor_;
+  Future<use<IAsyncStream>> Accept(){
+    auto p = make_promise<use<IAsyncStream>>();
+    Tcp t;
+    auto i = t.as<InterfaceUnknown>();
+    auto& s = get_tcp(i).socket_;
+    acceptor_.async_accept(s, [i, p](const asio::error_code& error){
+      try{
+        if (error){
+          p.SetError(error.value());
+        }
+        else{
+          p.Set(i.QueryInterface<IAsyncStream>());
+        }
+
+      }
+      catch (std::exception& e){
+        p.SetError(error_mapper::error_code_from_exception(e));
+      }
+    });
+    return p.QueryInterface<IFuture<use<IAsyncStream>>>();
+  }
+
+
+  ImplementTcpAcceptor(endpoint e, bool reuse_addr) 
+    :acceptor_{ get_io(), asio::ip::tcp::endpoint(get_address(e.address_), e.port_), reuse_addr }
+  {}
+
+};
+
+CPPCOMPONENTS_REGISTER(ImplementTcpAcceptor)
 
 CPPCOMPONENTS_DEFINE_FACTORY()
 

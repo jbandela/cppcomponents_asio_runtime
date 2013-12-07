@@ -351,7 +351,7 @@ namespace cppcomponents{
 
     struct IAcceptor :define_interface<cppcomponents::uuid<0x6269086f, 0xaaa7, 0x4ea5, 0xa65c, 0xbbf0b8394ffe>>
     {
-      Future<IAsyncStream> Accept();
+      Future<use<IAsyncStream>> Accept();
 
       CPPCOMPONENTS_CONSTRUCT(IAcceptor, Accept);
     };
@@ -364,14 +364,14 @@ namespace cppcomponents{
 
       CPPCOMPONENTS_INTERFACE_EXTRAS(IAcceptorCreator){
         use<InterfaceUnknown> TemplatedConstructor(endpoint e, bool reuse_address = true){
-          return this->get_interface().Create(e, reuse_addr);
+          return this->get_interface().Create(e, reuse_address);
         }
       };
     };
 
-    inline std::string AcceptorId(){ return "cppcomponents_asio_dll!Acceptor"; }
-    typedef runtime_class<AcceptorId, object_interfaces<IAcceptor>, factory_interface<IAcceptorCreator>> Acceptor_t;
-    typedef use_runtime_class<Acceptor_t> Acceptor;
+    inline std::string TcpAcceptorId(){ return "cppcomponents_asio_dll!TcpAcceptor"; }
+    typedef runtime_class<TcpAcceptorId, object_interfaces<IAcceptor>, factory_interface<IAcceptorCreator>> TcpAcceptor_t;
+    typedef use_runtime_class<TcpAcceptor_t> TcpAcceptor;
 
     inline std::string TcpId(){ return "cppcomponents_asio_dll!Tcp"; }
     inline std::string UdpId(){ return "cppcomponents_asio_dll!Udp"; }
