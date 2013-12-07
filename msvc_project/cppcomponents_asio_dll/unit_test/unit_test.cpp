@@ -6,41 +6,36 @@
 
 void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStream> is,
   cppcomponents::awaiter await){
-  std::string str;
   int loop = 0;
   while (true){
+  std::string str;
     loop++;
-    std::vector<char> vec(100);
-    auto fut = await.as_future(is.Read(vec));
+    auto fut = await.as_future(is.ReadBufferUntilString("\r\n\r\n"));
     if (fut.ErrorCode()){
       auto e = fut.ErrorCode();
       break;
     }
     auto buf = fut.Get();
-    if (buf == 0)break;
-    std::string s{vec.begin(),vec.begin() +  buf};
-    str += s;
-    if (str.size() > 4){
-      auto e = str.substr(str.size() - 4);
-      if (e == "\r\n\r\n")break;
-    }
+    str.append(buf.Begin(),buf.End());
+    std::cout << str << "\n";
+    std::stringstream strstream;
+    strstream <<
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: text/plain\r\n"
+      "Connection: Close\r\n"
+      "Content-Length: " << str.size() << "\r\n"
+      "\r\n"
+      << str;;
+
+
+    strstream << "\r\n\r\n";
+
+    auto s = strstream.str();
+    await(is.Write(cppcomponents::asio_runtime::const_simple_buffer{ &s[0], s.size() }));
   }
   // Generate the http response
   // In this case we are echoing back using http
-  std::stringstream strstream;
-  strstream <<
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Type: text/plain\r\n"
-    "Content-Length: " << str.size() << "\r\n"
-    "\r\n"
-    << str;;
 
-  
-  strstream << "\r\n\r\n";
-
-  auto s = strstream.str();
-  await(is.Write(cppcomponents::asio_runtime::const_simple_buffer{ &s[0], s.size() }));
-  is.QueryInterface<cppcomponents::asio_runtime::ISocket>().Close();
 }
 
 void main_async(int i, cppcomponents::awaiter await){
