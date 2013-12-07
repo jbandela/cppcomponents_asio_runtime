@@ -1,24 +1,46 @@
 #include "../../../cppcomponents_asio_runtime/cppcomponents_asio_runtime.hpp"
 #include <iostream>
 #include <cppcomponents_async_coroutine_wrapper/cppcomponents_resumable_await.hpp>
+#include <sstream>
 
 
 void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStream> is,
   cppcomponents::awaiter await){
-
+  std::string str;
+  int loop = 0;
   while (true){
-    std::vector<char>  vec(100);
+    loop++;
+    std::vector<char> vec(100);
     auto fut = await.as_future(is.Read(vec));
     if (fut.ErrorCode()){
       auto e = fut.ErrorCode();
-    }
-    else{
-
+      break;
     }
     auto buf = fut.Get();
-    std::string str{vec.begin(),vec.end()};
-    std::cout << str;
+    if (buf == 0)break;
+    std::string s{vec.begin(),vec.begin() +  buf};
+    str += s;
+    if (str.size() > 4){
+      auto e = str.substr(str.size() - 4);
+      if (e == "\r\n\r\n")break;
+    }
   }
+  // Generate the http response
+  // In this case we are echoing back using http
+  std::stringstream strstream;
+  strstream <<
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Type: text/plain\r\n"
+    "Content-Length: " << str.size() << "\r\n"
+    "\r\n"
+    << str;;
+
+  
+  strstream << "\r\n\r\n";
+
+  auto s = strstream.str();
+  await(is.Write(cppcomponents::asio_runtime::const_simple_buffer{ &s[0], s.size() }));
+  is.QueryInterface<cppcomponents::asio_runtime::ISocket>().Close();
 }
 
 void main_async(int i, cppcomponents::awaiter await){
@@ -29,7 +51,7 @@ void main_async(int i, cppcomponents::awaiter await){
   //auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ i }));
   //auto end = std::chrono::steady_clock::now();
   //std::cout << "Timer finished with error code " << f.ErrorCode() << " after " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "milliseconds \n";
-
+#if 0
   Tcp socket;
   
   await(socket.ConnectQueryRaw("www.google.com", "http", ISocket::Passive | ISocket::AddressConfigured));
@@ -45,12 +67,13 @@ void main_async(int i, cppcomponents::awaiter await){
     std::string str{ buf.Begin(), buf.End() };
     std::cout << str;
   }
-
+#endif 
   TcpAcceptor acceptor{ endpoint{ IPAddress::V4Loopback(), 7777 } };
 
   while (true){
     auto is = await(acceptor.Accept());
-    cppcomponents::resumable(print_connection)(is);
+    std::cout << "Received connect\n";
+    cppcomponents::async(cppcomponents::asio_runtime::Runtime::GetThreadPool(),std::bind(cppcomponents::resumable(print_connection),is));
   }
 }
 

@@ -585,7 +585,7 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
 
   Future<std::size_t> IAsyncStream_Read(simple_buffer buf){
     auto p = make_promise<std::size_t>();
-    asio::async_read(socket_, asio::buffer(buf.begin(), buf.size()), 
+    socket_.async_read_some( asio::buffer(buf.begin(), buf.size()),
       std::bind(&process_read,p,std::placeholders::_1,std::placeholders::_2));
     return p.QueryInterface<IFuture<std::size_t>>();
   }
@@ -617,7 +617,8 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
     auto p = make_promise<use<IBuffer>>();
     std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
 
-    asio::async_read(socket_, *spbuf, std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
+    asio::async_read(socket_, *spbuf, asio::transfer_at_least(1), 
+      std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
     return p.QueryInterface<IFuture<use<IBuffer>>>();
   }
   Future<use<IBuffer>> IAsyncStream_ReadBufferAt(std::uint64_t offset){
