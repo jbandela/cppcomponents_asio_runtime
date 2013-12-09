@@ -397,24 +397,29 @@ struct settable_option{
 
 typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream,IGetImplementation>> Tcp_t1;
 
-// NB: IGetImplementation returns socket
-struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
-  asio::ip::tcp::socket socket_;
-  void AssignRaw(std::int32_t ip_type, std::uint64_t socket){
+template<class Derived, class Socket> struct ImplementSocketHelper{
+
+  Derived* derived(){ return static_cast<Derived*>(this); }
+
+  Socket& socket(){ return derived()->socket_; }
+
+
+  void AssignRaw(std::int32_t ip_type, std::uint64_t s){
     if (ip_type == 4){
-      socket_.assign(asio::ip::tcp::v4(), socket);
+      socket().assign(asio::ip::tcp::v4(), s);
     }
-    else if(ip_type = 6){
-      socket_.assign(asio::ip::tcp::v6(), socket);
+    else if (ip_type = 6){
+      socket().assign(asio::ip::tcp::v6(), s);
 
     }
 
     throw error_invalid_arg();
   }
+
   Future<void> Connect(endpoint e){
     auto p = make_promise<void>();
-    asio::ip::tcp::endpoint ep( get_address(e.address_), e.port_ );
-    socket_.async_connect(ep, [p](const asio::error_code& error)
+    asio::ip::tcp::endpoint ep(get_address(e.address_), e.port_);
+    socket().async_connect(ep, [p](const asio::error_code& error)
     {
       if (!error)
       {
@@ -450,20 +455,20 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
     if (flags & ISocket::V4Mapped){
       f &= asio::ip::tcp::resolver::query::flags::v4_mapped;
     }
-    auto sq = std::make_shared<asio::ip::tcp::resolver::query>( host.to_string(), service.to_string(), f );
-    auto sr = std::make_shared<asio::ip::tcp::resolver>(get_io() );
+    auto sq = std::make_shared<asio::ip::tcp::resolver::query>(host.to_string(), service.to_string(), f);
+    auto sr = std::make_shared<asio::ip::tcp::resolver>(get_io());
 
     auto p = make_promise<void>();
-    auto* ps = &socket_;
-    auto iunk = this->QueryInterface<InterfaceUnknown>();
-    sr->async_resolve(*sq, [p, ps, iunk,sq,sr](
-      const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator  )mutable{
+    auto* ps = &socket();
+    auto iunk = derived()->template QueryInterface<InterfaceUnknown>();
+    sr->async_resolve(*sq, [p, ps, iunk, sq, sr](
+      const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)mutable{
       if (error){
         auto msg = error.message();
         p.SetError(error.value());
       }
       else{
-        asio::async_connect(*ps, iterator, [p,sq,sr](const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)
+        asio::async_connect(*ps, iterator, [p, sq, sr](const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)
         {
           if (error)
           {
@@ -482,20 +487,20 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
 
   }
   bool AtMark(){
-    return socket_.at_mark();
+    return socket().at_mark();
   }
   std::size_t Available(){
-    return socket_.available();
+    return socket().available();
   }
   void Bind(endpoint e){
-    return socket_.bind(asio::ip::tcp::endpoint(get_address(e.address_), e.port_));
- 
+    return socket().bind(asio::ip::tcp::endpoint(get_address(e.address_), e.port_));
+
   }
   void Cancel(){
-    socket_.cancel();
+    socket().cancel();
   }
   void Close(){
-    socket_.close();
+    socket().close();
   }
   void GetOptionRaw(int level, int option_name, void* option_value, std::size_t option_len){
     settable_option<> op;
@@ -504,7 +509,7 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
     op.data_ = option_value;
     op.size_ = option_len;
 
-    socket_.get_option(op);
+    socket().get_option(op);
 
 
   }
@@ -515,32 +520,32 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
     op.data_ = option_value;
     op.size_ = option_len;
 
-    socket_.set_option(op);
+    socket().set_option(op);
   }
   bool IsOpen(){
-    return socket_.is_open();
+    return socket().is_open();
   }
   int NativeHandle(){
-    return socket_.native_handle();
+    return socket().native_handle();
   }
   bool GetNonBlocking(){
-    return socket_.non_blocking();
+    return socket().non_blocking();
   }
   void SetNonBlocking(bool mode){
-    socket_.non_blocking(mode);
+    socket().non_blocking(mode);
   }
   bool GetNativeNonBlocking(){
-    return socket_.native_non_blocking();
+    return socket().native_non_blocking();
   }
   void SetNativeNonBlocking(bool mode){
-    socket_.native_non_blocking(mode);
+    socket().native_non_blocking(mode);
   }
   void OpenRaw(std::int32_t ip_type){
     if (ip_type == 4){
-      socket_.open(asio::ip::tcp::v4());
+      socket().open(asio::ip::tcp::v4());
     }
     else if (ip_type == 6){
-      socket_.open(asio::ip::tcp::v6());
+      socket().open(asio::ip::tcp::v6());
     }
     else{
       throw error_invalid_arg{};
@@ -548,8 +553,8 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
   }
 
   endpoint RemoteEndpoint(){
-    auto ep = socket_.remote_endpoint();
-    return endpoint{ ImplementIPAddress::create(ep.address()).QueryInterface<IIPAddress>(), ep.port()};
+    auto ep = socket().remote_endpoint();
+    return endpoint{ ImplementIPAddress::create(ep.address()).QueryInterface<IIPAddress>(), ep.port() };
   }
 
   void Shutdown(std::int32_t type){
@@ -559,19 +564,27 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
     }
     else if (type == asio::socket_base::shutdown_receive){
       s = asio::socket_base::shutdown_receive;
-    } 
+    }
     else if (type == asio::socket_base::shutdown_send){
       s = asio::socket_base::shutdown_send;
     }
     else{
       throw error_invalid_arg{};
     }
-    socket_.shutdown(s);
+    socket().shutdown(s);
   }
 
 
-  static void process_read(Promise<std::size_t> p, 
-    const asio::error_code& ec, std::size_t bytes_transferred){
+};
+
+template<class Derived, class Socket>
+struct ImplementAsyncStreamHelper{
+  Derived* derived(){ return static_cast<Derived*>(this); }
+
+  Socket& socket(){ return derived()->socket_; }
+
+  static void process_read(Promise<std::size_t> p,
+  const asio::error_code& ec, std::size_t bytes_transferred){
     try{
       if (ec){
         p.SetError(ec.value());
@@ -581,13 +594,13 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
       }
     }
     catch (std::exception& e){
-        p.SetError(error_mapper::error_code_from_exception(e));
-      }
+      p.SetError(error_mapper::error_code_from_exception(e));
+    }
   }
 
   Future<void> IAsyncStream_Poll(){
     auto p = make_promise<void>();
-    socket_.async_read_some(asio::null_buffers{},
+    socket().async_read_some(asio::null_buffers{},
       [p](const asio::error_code& ec, std::size_t bytes_transferred){
       try{
         if (ec && !(ec == asio::error::eof && bytes_transferred)){
@@ -607,8 +620,8 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
 
   Future<std::size_t> IAsyncStream_Read(simple_buffer buf){
     auto p = make_promise<std::size_t>();
-    socket_.async_read_some( asio::buffer(buf.begin(), buf.size()),
-      std::bind(&process_read,p,std::placeholders::_1,std::placeholders::_2));
+    socket().async_read_some(asio::buffer(buf.begin(), buf.size()),
+      std::bind(&process_read, p, std::placeholders::_1, std::placeholders::_2));
     return p.QueryInterface<IFuture<std::size_t>>();
   }
   Future<std::size_t> IAsyncStream_ReadAt(std::uint64_t offset, simple_buffer buf){
@@ -639,7 +652,7 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
     auto p = make_promise<use<IBuffer>>();
     std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
 
-    asio::async_read(socket_, *spbuf, asio::transfer_at_least(1), 
+    asio::async_read(socket(), *spbuf, asio::transfer_at_least(1),
       std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
     return p.QueryInterface<IFuture<use<IBuffer>>>();
   }
@@ -650,7 +663,7 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
     auto p = make_promise<use<IBuffer>>();
     std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
 
-    asio::async_read_until(socket_, *spbuf, c,std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
+    asio::async_read_until(socket(), *spbuf, c, std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
     return p.QueryInterface<IFuture<use<IBuffer>>>();
 
   }
@@ -658,7 +671,7 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
     auto p = make_promise<use<IBuffer>>();
     std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
 
-    asio::async_read_until(socket_, *spbuf, delim.to_string(), std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
+    asio::async_read_until(socket(), *spbuf, delim.to_string(), std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
     return p.QueryInterface<IFuture<use<IBuffer>>>();
 
   }
@@ -673,19 +686,27 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
       }
     }
     catch (std::exception& e){
-      p.SetError(error_mapper::error_code_from_exception(e)); 
+      p.SetError(error_mapper::error_code_from_exception(e));
     }
   }
 
   Future<std::size_t> IAsyncStream_Write(const_simple_buffer data){
     using namespace std::placeholders;
     auto p = make_promise<std::size_t>();
-    asio::async_write(socket_,asio::buffer(data.begin(),data.size()), std::bind(&process_write,p,_1,_2));
+    asio::async_write(socket(), asio::buffer(data.begin(), data.size()), std::bind(&process_write, p, _1, _2));
     return p.QueryInterface<IFuture<std::size_t>>();
   }
   Future<std::size_t> IAsyncStream_WriteAt(std::uint64_t offset, const_simple_buffer data){
     return IAsyncStream_Write(data);
   }
+};
+// NB: IGetImplementation returns socket
+struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>, 
+  ImplementSocketHelper<ImplementTcp,asio::ip::tcp::socket>,
+  ImplementAsyncStreamHelper<ImplementTcp,asio::ip::tcp::socket>{
+  asio::ip::tcp::socket socket_;
+
+
 
 
   ImplementTcp() :socket_{ get_io() }{}
