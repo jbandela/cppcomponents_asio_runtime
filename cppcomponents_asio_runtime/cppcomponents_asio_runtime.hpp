@@ -251,12 +251,12 @@ namespace cppcomponents{
   namespace asio_runtime{
     struct IAsyncDatagram :define_interface<cppcomponents::uuid<0x5e1f8df2, 0x3485, 0x416a, 0x8024, 0x9f18f7ecad02>>
     {
-      Future<void> ReceiveRaw(simple_buffer buf, std::uint32_t flags);
-      Future<void> ReceiveFromRaw(simple_buffer buf, endpoint sender, std::uint32_t flags);
+      Future<std::size_t> ReceiveRaw(simple_buffer buf, std::uint32_t flags);
+      Future<std::size_t> ReceiveFromRaw(simple_buffer buf, endpoint sender, std::uint32_t flags);
       Future<use<IBuffer>> ReceiveBufferRaw(std::uint32_t flags);
       Future<use<IBuffer>> ReceiveFromBufferRaw(endpoint sender, std::uint32_t flags);
-      void SendRaw(const_simple_buffer buffer, std::uint32_t flags);
-      void SendToRaw(const_simple_buffer buffer, endpoint receiver, std::uint32_t flags);
+      Future<std::size_t> SendRaw(const_simple_buffer buffer, std::uint32_t flags);
+      Future<std::size_t> SendToRaw(const_simple_buffer buffer, endpoint receiver, std::uint32_t flags);
 
       CPPCOMPONENTS_CONSTRUCT(IAsyncDatagram, ReceiveRaw, ReceiveFromRaw,
         SendRaw, SendToRaw);

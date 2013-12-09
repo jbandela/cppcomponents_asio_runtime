@@ -397,7 +397,7 @@ struct settable_option{
 
 typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream,IGetImplementation>> Tcp_t1;
 
-template<class Derived, class Socket> struct ImplementSocketHelper{
+template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelper{
 
   Derived* derived(){ return static_cast<Derived*>(this); }
 
@@ -406,10 +406,10 @@ template<class Derived, class Socket> struct ImplementSocketHelper{
 
   void AssignRaw(std::int32_t ip_type, std::uint64_t s){
     if (ip_type == 4){
-      socket().assign(asio::ip::tcp::v4(), s);
+      socket().assign(UdpOrTcp::v4(), s);
     }
     else if (ip_type = 6){
-      socket().assign(asio::ip::tcp::v6(), s);
+      socket().assign(UdpOrTcp::v6(), s);
 
     }
 
@@ -418,7 +418,7 @@ template<class Derived, class Socket> struct ImplementSocketHelper{
 
   Future<void> Connect(endpoint e){
     auto p = make_promise<void>();
-    asio::ip::tcp::endpoint ep(get_address(e.address_), e.port_);
+    UdpOrTcp::endpoint ep(get_address(e.address_), e.port_);
     socket().async_connect(ep, [p](const asio::error_code& error)
     {
       if (!error)
@@ -433,42 +433,42 @@ template<class Derived, class Socket> struct ImplementSocketHelper{
     return p.QueryInterface<IFuture<void>>();
   }
   Future<void> ConnectQueryRaw(cr_string host, cr_string service, std::uint32_t flags){
-    asio::ip::tcp::resolver::query::flags f{};
+    UdpOrTcp::resolver::query::flags f{};
     if (flags & ISocket::AddressConfigured){
-      f &= asio::ip::tcp::resolver::query::flags::address_configured;
+      f &= UdpOrTcp::resolver::query::flags::address_configured;
     }
     if (flags & ISocket::AllMatching){
-      f &= asio::ip::tcp::resolver::query::flags::all_matching;
+      f &= UdpOrTcp::resolver::query::flags::all_matching;
     }
     if (flags & ISocket::CanonicalName){
-      f &= asio::ip::tcp::resolver::query::flags::canonical_name;
+      f &= UdpOrTcp::resolver::query::flags::canonical_name;
     }
     if (flags & ISocket::NumericHost){
-      f &= asio::ip::tcp::resolver::query::flags::numeric_host;
+      f &= UdpOrTcp::resolver::query::flags::numeric_host;
     }
     if (flags & ISocket::NumericService){
-      f &= asio::ip::tcp::resolver::query::flags::numeric_service;
+      f &= UdpOrTcp::resolver::query::flags::numeric_service;
     }
     if (flags & ISocket::Passive){
-      f &= asio::ip::tcp::resolver::query::flags::passive;
+      f &= UdpOrTcp::resolver::query::flags::passive;
     }
     if (flags & ISocket::V4Mapped){
-      f &= asio::ip::tcp::resolver::query::flags::v4_mapped;
+      f &= UdpOrTcp::resolver::query::flags::v4_mapped;
     }
-    auto sq = std::make_shared<asio::ip::tcp::resolver::query>(host.to_string(), service.to_string(), f);
-    auto sr = std::make_shared<asio::ip::tcp::resolver>(get_io());
+    auto sq = std::make_shared<UdpOrTcp::resolver::query>(host.to_string(), service.to_string(), f);
+    auto sr = std::make_shared<UdpOrTcp::resolver>(get_io());
 
     auto p = make_promise<void>();
     Socket* ps = &socket();
     auto iunk = derived()->template QueryInterface<InterfaceUnknown>();
     sr->async_resolve(*sq, [p, ps, iunk, sq, sr](
-      const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)mutable {
+      const asio::error_code& error, UdpOrTcp::resolver::iterator iterator)mutable {
       if (error){
         auto msg = error.message();
         p.SetError(error.value());
       }
       else{
-        asio::async_connect(*ps, iterator, [p, sq, sr](const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)
+        asio::async_connect(*ps, iterator, [p, sq, sr](const asio::error_code& error, UdpOrTcp::resolver::iterator iterator)
         {
           if (error)
           {
@@ -493,7 +493,7 @@ template<class Derived, class Socket> struct ImplementSocketHelper{
     return socket().available();
   }
   void Bind(endpoint e){
-    return socket().bind(asio::ip::tcp::endpoint(get_address(e.address_), e.port_));
+    return socket().bind(UdpOrTcp::endpoint(get_address(e.address_), e.port_));
 
   }
   void Cancel(){
@@ -542,10 +542,10 @@ template<class Derived, class Socket> struct ImplementSocketHelper{
   }
   void OpenRaw(std::int32_t ip_type){
     if (ip_type == 4){
-      socket().open(asio::ip::tcp::v4());
+      socket().open(UdpOrTcp::v4());
     }
     else if (ip_type == 6){
-      socket().open(asio::ip::tcp::v6());
+      socket().open(UdpOrTcp::v6());
     }
     else{
       throw error_invalid_arg{};
@@ -702,7 +702,7 @@ struct ImplementAsyncStreamHelper{
 };
 // NB: IGetImplementation returns socket
 struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>, 
-  ImplementSocketHelper<ImplementTcp,asio::ip::tcp::socket>,
+  ImplementSocketHelper<ImplementTcp,asio::ip::tcp::socket,asio::ip::tcp>,
   ImplementAsyncStreamHelper<ImplementTcp,asio::ip::tcp::socket>{
   asio::ip::tcp::socket socket_;
 
@@ -759,6 +759,139 @@ struct ImplementTcpAcceptor :implement_runtime_class<ImplementTcpAcceptor, TcpAc
 };
 
 CPPCOMPONENTS_REGISTER(ImplementTcpAcceptor)
+
+struct ImplementUdp:implement_runtime_class<ImplementUdp,Udp_t>,
+  ImplementSocketHelper<ImplementUdp,asio::ip::udp::socket,asio::ip::udp>
+{
+  asio::ip::udp::socket socket_;
+
+  ImplementUdp() :socket_{ get_io() }{}
+  static void process_receive(Promise<std::size_t> p,
+    const asio::error_code& ec, std::size_t bytes_transferred){
+    try{
+      if (ec){
+        p.SetError(ec.value());
+      }
+      else{
+        p.Set(bytes_transferred);
+      }
+    }
+    catch (std::exception& e){
+      p.SetError(error_mapper::error_code_from_exception(e));
+    }
+  }
+
+  Future<void> IAsyncStream_Poll(){
+    auto p = make_promise<void>();
+    socket().async_receive(asio::null_buffers{},
+      [p](const asio::error_code& ec, std::size_t bytes_transferred){
+      try{
+        if (ec){
+          p.SetError(ec.value());
+        }
+        else{
+          p.Set();
+        }
+      }
+      catch (std::exception& e){
+        p.SetError(error_mapper::error_code_from_exception(e));
+      }
+    });
+    return p.QueryInterface<IFuture<void>>();
+
+  }
+
+  Future<std::size_t> IAsyncDatagram_ReceiveRaw(simple_buffer buf, std::uint32_t flags){
+    auto p = make_promise<std::size_t>();
+    socket().async_receive(asio::buffer(buf.begin(), buf.size()),flags,
+      std::bind(&process_receive, p, std::placeholders::_1, std::placeholders::_2));
+    return p.QueryInterface<IFuture<std::size_t>>();
+  }
+
+  Future<std::size_t> IAsyncDatagram_ReceiveFromRaw(simple_buffer buf, endpoint sender, std::uint32_t flags){
+    auto p = make_promise<std::size_t>();
+    socket().async_receive_from(asio::buffer(buf.begin(), buf.size()), asio::ip::udp::endpoint(get_address(sender.address_),sender.port_), flags,
+      std::bind(&process_receive, p, std::placeholders::_1, std::placeholders::_2));
+    return p.QueryInterface<IFuture<std::size_t>>();
+  }
+
+  static void process_buffer_receive(Promise<use<IBuffer>> p, use<IBuffer> ib,
+    const asio::error_code& ec, std::size_t bytes_transferred){
+    if (ec){
+      auto msg = ec.message();
+      p.SetError(ec.value());
+    }
+    else{
+      try{
+        ib.SetSize(bytes_transferred);
+        p.Set(ib);
+      }
+      catch (std::exception& e){
+        p.SetError(error_mapper::error_code_from_exception(e));
+      }
+    }
+  }
+
+
+  static const int max_udp_size = 65507;
+
+  Future<use<IBuffer>> IAsyncDatagram_ReceiveBufferRaw(std::uint32_t flags){
+    auto p = make_promise<use<IBuffer>>();
+    auto ib = Buffer::Create(max_udp_size);
+    
+
+    socket().async_receive(asio::buffer(ib.Begin(), ib.Size()), flags,
+      std::bind(&process_buffer_receive, p, ib, std::placeholders::_1, std::placeholders::_2));
+    return p.QueryInterface<IFuture<use<IBuffer>>>();
+  }
+
+  Future<use<IBuffer>> IAsyncDatagram_ReceiveFromBufferRaw(endpoint sender, std::uint32_t flags){
+    auto p = make_promise<use<IBuffer>>();
+    auto ib = Buffer::Create(max_udp_size);
+
+    socket().async_receive_from(asio::buffer(ib.Begin(), ib.Size()), asio::ip::udp::endpoint(get_address(sender.address_), sender.port_), flags,
+      std::bind(&process_buffer_receive, p, ib, std::placeholders::_1, std::placeholders::_2));
+    return p.QueryInterface<IFuture<use<IBuffer>>>();
+  }
+
+
+  static void process_send(Promise<std::size_t> p, const asio::error_code& error, std::size_t bytes_written){
+    try{
+      if (error){
+        p.SetError(error.value());
+      }
+      else{
+        p.Set(bytes_written);
+      }
+    }
+    catch (std::exception& e){
+      p.SetError(error_mapper::error_code_from_exception(e));
+    }
+  }
+
+
+
+  Future<std::size_t> IAsyncDatagram_SendRaw(const_simple_buffer data, std::uint32_t flags){
+    using namespace std::placeholders;
+    auto p = make_promise<std::size_t>();
+    socket().async_send(asio::buffer(data.begin(), data.size()), flags,std::bind(&process_send, p, _1, _2));
+    return p.QueryInterface<IFuture<std::size_t>>();
+  }
+
+
+  Future<std::size_t> IAsyncDatagram_SendToRaw(const_simple_buffer data, endpoint receiver, std::uint32_t flags){
+    using namespace std::placeholders;
+    auto p = make_promise<std::size_t>();
+    socket().async_send_to(asio::buffer(data.begin(), data.size()), asio::ip::udp::endpoint(get_address(receiver.address_), receiver.port_),
+      flags, std::bind(&process_send, p, _1, _2));
+    return p.QueryInterface<IFuture<std::size_t>>();
+
+
+  }
+
+};
+
+CPPCOMPONENTS_REGISTER(ImplementUdp)
 
 CPPCOMPONENTS_DEFINE_FACTORY()
 
