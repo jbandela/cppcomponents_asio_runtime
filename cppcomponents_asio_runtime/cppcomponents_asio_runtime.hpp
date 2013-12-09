@@ -25,7 +25,14 @@ namespace cppcomponents{
       basic_simple_buffer(Char(&ar)[sz])
         : data_{ &ar[0] },
         len_{ sz }
-      {}
+      {
+	// remove the null terminator (assuming this is a string)
+        if (data_ && len_){
+          if (data_[len_ - 1] == 0){
+            --len_;
+          }
+        }
+      }
       template<std::size_t sz>
       basic_simple_buffer(UChar(&ar)[sz])
         : data_{ reinterpret_cast<Char*>(&ar[0]) },
@@ -261,9 +268,9 @@ namespace cppcomponents{
     struct IAsyncDatagram :define_interface<cppcomponents::uuid<0x5e1f8df2, 0x3485, 0x416a, 0x8024, 0x9f18f7ecad02>>
     {
       Future<std::size_t> ReceiveRaw(simple_buffer buf, std::uint32_t flags);
-      Future<std::size_t> ReceiveFromRaw(simple_buffer buf, endpoint sender, std::uint32_t flags);
+      Future<std::pair<std::size_t,endpoint>> ReceiveFromRaw(simple_buffer buf,std::uint32_t flags);
       Future<use<IBuffer>> ReceiveBufferRaw(std::uint32_t flags);
-      Future<use<IBuffer>> ReceiveFromBufferRaw(endpoint sender, std::uint32_t flags);
+      Future<std::pair<use<IBuffer>,endpoint>> ReceiveFromBufferRaw(std::uint32_t flags);
       Future<std::size_t> SendRaw(const_simple_buffer buffer, std::uint32_t flags);
       Future<std::size_t> SendToRaw(const_simple_buffer buffer, endpoint receiver, std::uint32_t flags);
 

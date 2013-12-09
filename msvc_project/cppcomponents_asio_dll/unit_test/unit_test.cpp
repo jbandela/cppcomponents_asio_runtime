@@ -45,22 +45,44 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 
     using namespace cppcomponents::asio_runtime;
     Udp u;
-    await(u.ConnectQueryRaw(cppcomponents::cr_string("localhost"), "7000",0));
+    u.OpenRaw(4);
+    await(u.ConnectQueryRaw(cppcomponents::cr_string("127.0.0.1"), "7000",0));
     await(u.SendRaw("World", 0));
     auto buf = await(u.ReceiveBufferRaw(0));
     std::string s(buf.Begin(), buf.End());
-    assert(s == "Hello World");
+    auto b = (s == std::string("Hello World"));
+    //assert(true);
 
     
   }
 
   void udp_server(cppcomponents::awaiter await){
+    using namespace cppcomponents::asio_runtime;
+      Udp u;
+      u.OpenRaw(4);
+      auto sip = IPAddress::V4Loopback().ToString();
+      u.Bind(endpoint(IPAddress::V4FromString("0.0.0.0"), 7000));
+
+      endpoint ep;
+      cppcomponents::use<cppcomponents::IBuffer> ib;
+      std::tie(ib, ep) = await(u.ReceiveFromBufferRaw(0));
+      std::string s(ib.Begin(), ib.End());
+      s = "Hello " + s;
+      await(u.SendToRaw(const_simple_buffer(&s[0], s.size()), ep, 0));
+      auto b = (s == "Hello World");
+      assert(s == "Hello World");
 
   }
 void main_async(int i, cppcomponents::awaiter await){
+  
   using namespace cppcomponents;
   using namespace asio_runtime;
-  Runtime::GetThreadPool();
+
+
+  Runtime::GetThreadPool(1);
+
+  resumable(udp_server)();
+  resumable(udp_client)();
 
   auto eps = await(Tcp::Query("www.google.com", "https", ISocket::Passive | ISocket::AddressConfigured));
   std::vector<std::string> ipstrings;

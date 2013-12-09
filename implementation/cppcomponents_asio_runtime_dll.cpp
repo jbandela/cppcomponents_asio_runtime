@@ -559,8 +559,12 @@ template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelp
     return socket().available();
   }
   void Bind(endpoint e){
-    return socket().bind(typename UdpOrTcp::endpoint(get_address(e.address_), e.port_));
-
+    try{
+      return socket().bind(typename UdpOrTcp::endpoint(get_address(e.address_), e.port_));
+    }
+    catch (asio::system_error& e){
+      auto msg = e.what();
+    }
   }
   void Cancel(){
     socket().cancel();
@@ -845,27 +849,26 @@ struct ImplementUdp:implement_runtime_class<ImplementUdp,Udp_t>,
     catch (std::exception& e){
       p.SetError(error_mapper::error_code_from_exception(e));
     }
+  } 
+
+  static void process_receive_from(Promise<std::pair<std::size_t, endpoint>> p, std::shared_ptr<asio::ip::udp::endpoint> uep,
+    const asio::error_code& ec, std::size_t bytes_transferred){
+    try{
+      if (ec){
+        p.SetError(ec.value());
+      }
+      else{
+        auto address = ImplementIPAddress::create(uep->address()).QueryInterface<IIPAddress>();
+        endpoint ep(address, uep->port());
+        p.Set(std::make_pair(bytes_transferred,ep));
+      }
+    }
+    catch (std::exception& e){
+      p.SetError(error_mapper::error_code_from_exception(e));
+    }
   }
 
-  Future<void> IAsyncStream_Poll(){
-    auto p = make_promise<void>();
-    socket().async_receive(asio::null_buffers{},
-      [p](const asio::error_code& ec, std::size_t bytes_transferred){
-      try{
-        if (ec){
-          p.SetError(ec.value());
-        }
-        else{
-          p.Set();
-        }
-      }
-      catch (std::exception& e){
-        p.SetError(error_mapper::error_code_from_exception(e));
-      }
-    });
-    return p.QueryInterface<IFuture<void>>();
 
-  }
 
   Future<std::size_t> IAsyncDatagram_ReceiveRaw(simple_buffer buf, std::uint32_t flags){
     auto p = make_promise<std::size_t>();
@@ -874,12 +877,13 @@ struct ImplementUdp:implement_runtime_class<ImplementUdp,Udp_t>,
     return p.QueryInterface<IFuture<std::size_t>>();
   }
 
-  Future<std::size_t> IAsyncDatagram_ReceiveFromRaw(simple_buffer buf, endpoint sender, std::uint32_t flags){
-    auto p = make_promise<std::size_t>();
-    asio::ip::udp::endpoint ep(get_address(sender.address_), sender.port_);
-    socket().async_receive_from(asio::buffer(buf.begin(), buf.size()),ep , flags,
-      std::bind(&process_receive, p, std::placeholders::_1, std::placeholders::_2));
-    return p.QueryInterface<IFuture<std::size_t>>();
+
+  Future<std::pair<std::size_t, endpoint>> IAsyncDatagram_ReceiveFromRaw(simple_buffer buf, std::uint32_t flags){
+    auto p = make_promise<std::pair<std::size_t, endpoint>>();
+    auto uep = std::make_shared<asio::ip::udp::endpoint>();
+    socket().async_receive_from(asio::buffer(buf.begin(), buf.size()),*uep , flags,
+      std::bind(&process_receive_from, p,uep, std::placeholders::_1, std::placeholders::_2));
+    return p.QueryInterface<IFuture<std::pair<std::size_t, endpoint>>>();
   }
 
   static void process_buffer_receive(Promise<use<IBuffer>> p, use<IBuffer> ib,
@@ -898,7 +902,24 @@ struct ImplementUdp:implement_runtime_class<ImplementUdp,Udp_t>,
       }
     }
   }
-
+  static void process_buffer_receive_from(Promise<std::pair<use<IBuffer>, endpoint>> p, use<IBuffer> ib, std::shared_ptr<asio::ip::udp::endpoint> uep,
+    const asio::error_code& ec, std::size_t bytes_transferred){
+    if (ec){
+      auto msg = ec.message();
+      p.SetError(ec.value());
+    }
+    else{
+      try{
+        ib.SetSize(bytes_transferred);
+        auto address = ImplementIPAddress::create(uep->address()).QueryInterface<IIPAddress>();
+        endpoint ep(address, uep->port());
+        p.Set(std::make_pair(ib,ep));
+      }
+      catch (std::exception& e){
+        p.SetError(error_mapper::error_code_from_exception(e));
+      }
+    }
+  }
 
   static const int max_udp_size = 65507;
 
@@ -912,19 +933,21 @@ struct ImplementUdp:implement_runtime_class<ImplementUdp,Udp_t>,
     return p.QueryInterface<IFuture<use<IBuffer>>>();
   }
 
-  Future<use<IBuffer>> IAsyncDatagram_ReceiveFromBufferRaw(endpoint sender, std::uint32_t flags){
-    auto p = make_promise<use<IBuffer>>();
+  Future<std::pair<use<IBuffer>, endpoint>> IAsyncDatagram_ReceiveFromBufferRaw(std::uint32_t flags){
+    auto p = make_promise<std::pair<use<IBuffer>, endpoint>>();
     auto ib = Buffer::Create(max_udp_size);
-    asio::ip::udp::endpoint ep(get_address(sender.address_), sender.port_);
-    socket().async_receive_from(asio::buffer(ib.Begin(), ib.Size()),ep, flags,
-      std::bind(&process_buffer_receive, p, ib, std::placeholders::_1, std::placeholders::_2));
-    return p.QueryInterface<IFuture<use<IBuffer>>>();
+    auto uep = std::make_shared<asio::ip::udp::endpoint>();
+
+    socket().async_receive_from(asio::buffer(ib.Begin(), ib.Size()),*uep, flags,
+      std::bind(&process_buffer_receive_from, p, ib,uep, std::placeholders::_1, std::placeholders::_2));
+    return p.QueryInterface<IFuture<std::pair<use<IBuffer>, endpoint>>>();
   }
 
 
   static void process_send(Promise<std::size_t> p, const asio::error_code& error, std::size_t bytes_written){
     try{
       if (error){
+        auto msg = error.message();
         p.SetError(error.value());
       }
       else{
