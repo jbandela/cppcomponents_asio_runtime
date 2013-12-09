@@ -414,7 +414,7 @@ struct settable_option{
 };
 
 
-typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream,IGetImplementation>> Tcp_t1;
+typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream, IGetImplementation>, static_interfaces<IQueryStatic>> Tcp_t1;
 
 template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelper{
   typedef typename  UdpOrTcp::resolver::iterator RIter;
@@ -452,6 +452,52 @@ template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelp
 
     return p.QueryInterface<IFuture<void>>();
   }
+
+  static  Future<std::vector<endpoint>> Query(cr_string host, cr_string service, std::uint32_t flags){
+    typename UdpOrTcp::resolver::query::flags f{};
+    if (flags & ISocket::AddressConfigured){
+      f &= UdpOrTcp::resolver::query::flags::address_configured;
+    }
+    if (flags & ISocket::AllMatching){
+      f &= UdpOrTcp::resolver::query::flags::all_matching;
+    }
+    if (flags & ISocket::CanonicalName){
+      f &= UdpOrTcp::resolver::query::flags::canonical_name;
+    }
+    if (flags & ISocket::NumericHost){
+      f &= UdpOrTcp::resolver::query::flags::numeric_host;
+    }
+    if (flags & ISocket::NumericService){
+      f &= UdpOrTcp::resolver::query::flags::numeric_service;
+    }
+    if (flags & ISocket::Passive){
+      f &= UdpOrTcp::resolver::query::flags::passive;
+    }
+    if (flags & ISocket::V4Mapped){
+      f &= UdpOrTcp::resolver::query::flags::v4_mapped;
+    }
+    auto sq = std::make_shared<typename UdpOrTcp::resolver::query>(host.to_string(), service.to_string(), f);
+    auto sr = std::make_shared<typename UdpOrTcp::resolver>(get_io());
+
+    auto p = make_promise<std::vector<endpoint>>();
+
+    sr->async_resolve(*sq, [p, sq, sr](
+      const asio::error_code& error, typename UdpOrTcp::resolver::iterator iterator)mutable {
+      if (error){
+        p.SetError(error.value());
+      }
+      else{
+        std::vector<endpoint> endpoints;
+        for (auto iter = iterator; iter != RIter{}; ++iter){
+          auto ipaddr = ImplementIPAddress::create(iter->endpoint().address()).template QueryInterface<IIPAddress>();
+          endpoints.push_back(endpoint(ipaddr,iter->endpoint().port()));
+        }
+        p.Set(endpoints);
+      }
+    });
+    return p.QueryInterface<IFuture<std::vector<endpoint>>>();
+  }
+
   Future<void> ConnectQueryRaw(cr_string host, cr_string service, std::uint32_t flags){
     typename UdpOrTcp::resolver::query::flags f{};
     if (flags & ISocket::AddressConfigured){

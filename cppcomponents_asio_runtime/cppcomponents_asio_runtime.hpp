@@ -206,6 +206,10 @@ namespace cppcomponents{
     struct endpoint{
       use<IIPAddress> address_;
       std::int32_t port_;
+
+      endpoint() :port_(0){}
+
+      endpoint(use<IIPAddress> address, std::int32_t port) :address_{ address }, port_{ port }{}
     };
 
     namespace detail{
@@ -263,7 +267,7 @@ namespace cppcomponents{
       Future<std::size_t> SendRaw(const_simple_buffer buffer, std::uint32_t flags);
       Future<std::size_t> SendToRaw(const_simple_buffer buffer, endpoint receiver, std::uint32_t flags);
 
-      CPPCOMPONENTS_CONSTRUCT(IAsyncDatagram, ReceiveRaw, ReceiveFromRaw,
+      CPPCOMPONENTS_CONSTRUCT(IAsyncDatagram, ReceiveRaw, ReceiveFromRaw, ReceiveBufferRaw, ReceiveFromBufferRaw,
         SendRaw, SendToRaw);
     };
 
@@ -317,6 +321,12 @@ namespace cppcomponents{
 
 
 
+    };
+
+    struct IQueryStatic :define_interface<cppcomponents::uuid<0x9a57a9c7, 0xf3e6, 0x423b, 0xafcb, 0xf4b9440f04f5>>
+    {
+      Future<std::vector<endpoint>> Query(cr_string host, cr_string service, std::uint32_t flags);
+      CPPCOMPONENTS_CONSTRUCT(IQueryStatic, Query);
     };
 
     struct ITimer :define_interface<cppcomponents::uuid<0xb9618857, 0x9b3e, 0x452e, 0x92c4, 0x352f9e0334e8>>
@@ -384,10 +394,10 @@ namespace cppcomponents{
     inline std::string TcpId(){ return "cppcomponents_asio_dll!Tcp"; }
     inline std::string UdpId(){ return "cppcomponents_asio_dll!Udp"; }
 
-    typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream>> Tcp_t;
+    typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream>, static_interfaces<IQueryStatic>> Tcp_t;
     typedef use_runtime_class<Tcp_t> Tcp;
 
-    typedef runtime_class<UdpId, object_interfaces<ISocket, IAsyncDatagram>> Udp_t;
+    typedef runtime_class<UdpId, object_interfaces<ISocket, IAsyncDatagram>, static_interfaces<IQueryStatic>> Udp_t;
     typedef use_runtime_class<Udp_t> Udp;
 
   }

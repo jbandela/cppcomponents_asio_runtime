@@ -33,15 +33,40 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
     auto s = strstream.str();
     await(is.Write(cppcomponents::asio_runtime::const_simple_buffer{ &s[0], s.size() }));
   }
+
+
   // Generate the http response
   // In this case we are echoing back using http
 
 }
 
+  void udp_client(cppcomponents::awaiter await) {
+
+
+    using namespace cppcomponents::asio_runtime;
+    Udp u;
+    await(u.ConnectQueryRaw(cppcomponents::cr_string("localhost"), "7000",0));
+    await(u.SendRaw("World", 0));
+    auto buf = await(u.ReceiveBufferRaw(0));
+    std::string s(buf.Begin(), buf.End());
+    assert(s == "Hello World");
+
+    
+  }
+
+  void udp_server(cppcomponents::awaiter await){
+
+  }
 void main_async(int i, cppcomponents::awaiter await){
   using namespace cppcomponents;
   using namespace asio_runtime;
   Runtime::GetThreadPool();
+
+  auto eps = await(Tcp::Query("www.google.com", "https", ISocket::Passive | ISocket::AddressConfigured));
+  std::vector<std::string> ipstrings;
+  for (auto& e : eps){
+    ipstrings.push_back(e.address_.ToString());
+  }
   //auto start = std::chrono::steady_clock::now();
   //auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ i }));
   //auto end = std::chrono::steady_clock::now();
