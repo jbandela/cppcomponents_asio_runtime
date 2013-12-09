@@ -394,8 +394,10 @@ struct settable_option{
   }
 };
 
+
 typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream,IGetImplementation>> Tcp_t1;
 
+// NB: IGetImplementation returns socket
 struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
   asio::ip::tcp::socket socket_;
   void AssignRaw(std::int32_t ip_type, std::uint64_t socket){
@@ -571,7 +573,7 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
   static void process_read(Promise<std::size_t> p, 
     const asio::error_code& ec, std::size_t bytes_transferred){
     try{
-      if (ec && !(ec == asio::error::eof && bytes_transferred)){
+      if (ec){
         p.SetError(ec.value());
       }
       else{
@@ -581,6 +583,26 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
     catch (std::exception& e){
         p.SetError(error_mapper::error_code_from_exception(e));
       }
+  }
+
+  Future<void> IAsyncStream_Poll(){
+    auto p = make_promise<void>();
+    socket_.async_read_some(asio::null_buffers{},
+      [p](const asio::error_code& ec, std::size_t bytes_transferred){
+      try{
+        if (ec && !(ec == asio::error::eof && bytes_transferred)){
+          p.SetError(ec.value());
+        }
+        else{
+          p.Set();
+        }
+      }
+      catch (std::exception& e){
+        p.SetError(error_mapper::error_code_from_exception(e));
+      }
+    });
+    return p.QueryInterface<IFuture<void>>();
+
   }
 
   Future<std::size_t> IAsyncStream_Read(simple_buffer buf){
@@ -595,7 +617,7 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
 
   static void process_streambuf_read(Promise<use<IBuffer>> p, std::shared_ptr<asio::streambuf> spbuf,
     const asio::error_code& ec, std::size_t bytes_transferred){
-    if (ec && !(ec == asio::error::eof && bytes_transferred)){
+    if (ec){
       auto msg = ec.message();
       p.SetError(ec.value());
     }
@@ -668,10 +690,10 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
 
   ImplementTcp() :socket_{ get_io() }{}
   void* IGetImplementation_GetImplementationRaw(){
-    return this;
+    return &socket_;
   }
   const void* IGetImplementation_GetImplementationConstRaw(){
-    return this;
+    return &socket_;
   }
 
 
@@ -681,25 +703,23 @@ struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>{
 
 CPPCOMPONENTS_REGISTER(ImplementTcp)
 
-ImplementTcp& get_tcp(use<InterfaceUnknown> i){
-  return i.QueryInterface<IGetImplementation>().GetImplementation<ImplementTcp>();
+asio::ip::tcp::socket& get_tcp_socket(use<InterfaceUnknown> i){
+  return i.QueryInterface<IGetImplementation>().GetImplementation<asio::ip::tcp::socket>();
 }
 
 struct ImplementTcpAcceptor :implement_runtime_class<ImplementTcpAcceptor, TcpAcceptor_t>
 {
   asio::ip::tcp::acceptor acceptor_;
-  Future<use<IAsyncStream>> Accept(){
-    auto p = make_promise<use<IAsyncStream>>();
-    Tcp t;
-    auto i = t.as<InterfaceUnknown>();
-    auto& s = get_tcp(i).socket_;
+  Future<void> Accept(use<ISocket> i){
+    auto p = make_promise<void>();
+    auto& s = get_tcp_socket(i);
     acceptor_.async_accept(s, [i, p](const asio::error_code& error){
       try{
         if (error){
           p.SetError(error.value());
         }
         else{
-          p.Set(i.QueryInterface<IAsyncStream>());
+          p.Set();
         }
 
       }
@@ -707,7 +727,7 @@ struct ImplementTcpAcceptor :implement_runtime_class<ImplementTcpAcceptor, TcpAc
         p.SetError(error_mapper::error_code_from_exception(e));
       }
     });
-    return p.QueryInterface<IFuture<use<IAsyncStream>>>();
+    return p.QueryInterface<IFuture<void>>();
   }
 
 

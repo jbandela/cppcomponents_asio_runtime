@@ -44,6 +44,7 @@ namespace cppcomponents{
 
       basic_simple_buffer(Char* d, std::size_t sz) :data_{ d }, len_{ sz }{}
       basic_simple_buffer(UChar* d, std::size_t sz) :data_{ reinterpret_cast<Char*>(d) }, len_{ sz }{}
+      basic_simple_buffer() :data_{ nullptr }, len_{ 0 }{}
 
       Char* begin(){ return data_; }
       Char* end(){ return begin() + len_; }
@@ -152,11 +153,13 @@ namespace cppcomponents{
       Future<use<IBuffer>> ReadBufferUntilChar(char c);
       Future<use<IBuffer>> ReadBufferUntilString(cr_string delim);
 
+      Future<void> Poll();
+
       Future<std::size_t> Write(const_simple_buffer data);
       Future<std::size_t> WriteAt(std::uint64_t offset, const_simple_buffer data);
 
       CPPCOMPONENTS_CONSTRUCT(IAsyncStream, Read, ReadAt, 
-        ReadBuffer, ReadBufferAt, ReadBufferUntilChar, ReadBufferUntilString,Write,WriteAt);
+        ReadBuffer, ReadBufferAt, ReadBufferUntilChar, ReadBufferUntilString,Poll,Write,WriteAt);
 
     };
 
@@ -351,7 +354,7 @@ namespace cppcomponents{
 
     struct IAcceptor :define_interface<cppcomponents::uuid<0x6269086f, 0xaaa7, 0x4ea5, 0xa65c, 0xbbf0b8394ffe>>
     {
-      Future<use<IAsyncStream>> Accept();
+      Future<void> Accept(use<ISocket>);
 
       CPPCOMPONENTS_CONSTRUCT(IAcceptor, Accept);
     };

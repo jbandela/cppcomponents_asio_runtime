@@ -46,7 +46,7 @@ void main_async(int i, cppcomponents::awaiter await){
   //auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ i }));
   //auto end = std::chrono::steady_clock::now();
   //std::cout << "Timer finished with error code " << f.ErrorCode() << " after " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "milliseconds \n";
-#if 0
+#if 1
   Tcp socket;
   
   await(socket.ConnectQueryRaw("www.google.com", "http", ISocket::Passive | ISocket::AddressConfigured));
@@ -66,9 +66,11 @@ void main_async(int i, cppcomponents::awaiter await){
   TcpAcceptor acceptor{ endpoint{ IPAddress::V4Loopback(), 7777 } };
 
   while (true){
-    auto is = await(acceptor.Accept());
+    Tcp t;
+    auto is = t.as<ISocket>();
+    await(acceptor.Accept(is));
     std::cout << "Received connect\n";
-    cppcomponents::async(cppcomponents::asio_runtime::Runtime::GetThreadPool(),std::bind(cppcomponents::resumable(print_connection),is));
+    cppcomponents::async(cppcomponents::asio_runtime::Runtime::GetThreadPool(),std::bind(cppcomponents::resumable(print_connection),is.QueryInterface<IAsyncStream>()));
   }
 }
 
