@@ -38,8 +38,8 @@ typedef runtime_class<RuntimeId, factory_interface<NoConstructorFactoryInterface
 
 
 struct io_service_runner{
-  std::atomic<bool> should_stop_ = false;
-  std::atomic<bool> stop_if_no_work_ = false;
+  std::atomic<bool> should_stop_ = { false };
+  std::atomic<bool> stop_if_no_work_ = { false };
   asio::io_service* io_;
   std::thread t_;
 
@@ -103,7 +103,7 @@ struct io_service_runner{
 };
 
 struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>{
-  std::atomic<bool> lock_ = false;
+  std::atomic<bool> lock_ = { false };
   asio::io_service io_service_;
   std::vector<std::unique_ptr<io_service_runner>> threads_;
   std::int32_t min_threads_;
@@ -459,10 +459,10 @@ template<class Derived, class Socket> struct ImplementSocketHelper{
     auto sr = std::make_shared<asio::ip::tcp::resolver>(get_io());
 
     auto p = make_promise<void>();
-    auto* ps = &socket();
+    Socket* ps = &socket();
     auto iunk = derived()->template QueryInterface<InterfaceUnknown>();
     sr->async_resolve(*sq, [p, ps, iunk, sq, sr](
-      const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)mutable{
+      const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)mutable {
       if (error){
         auto msg = error.message();
         p.SetError(error.value());
@@ -554,7 +554,7 @@ template<class Derived, class Socket> struct ImplementSocketHelper{
 
   endpoint RemoteEndpoint(){
     auto ep = socket().remote_endpoint();
-    return endpoint{ ImplementIPAddress::create(ep.address()).QueryInterface<IIPAddress>(), ep.port() };
+    return endpoint{ImplementIPAddress::create(ep.address()).template QueryInterface<IIPAddress>(), ep.port() };
   }
 
   void Shutdown(std::int32_t type){

@@ -21,22 +21,22 @@ namespace cppcomponents{
 
       {
       }
-      template<int sz>
+      template<std::size_t sz>
       basic_simple_buffer(Char(&ar)[sz])
         : data_{ &ar[0] },
         len_{ sz }
       {}
-      template<int sz>
+      template<std::size_t sz>
       basic_simple_buffer(UChar(&ar)[sz])
         : data_{ reinterpret_cast<Char*>(&ar[0]) },
         len_{ sz }
       {}
-      template<int sz>
+      template<std::size_t sz>
       basic_simple_buffer(std::array<Char, sz>&ar)
         : data_{ &ar[0] },
         len_{ size }
       {}
-      template<int sz>
+      template<std::size_t sz>
       basic_simple_buffer(std::array<UChar, sz>&ar)
         : data_{ reinterpret_cast<Char*>(&ar[0]) },
         len_{ sz }
