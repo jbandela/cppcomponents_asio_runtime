@@ -129,6 +129,11 @@ namespace cppcomponents{
     typedef runtime_class<RuntimeId, factory_interface<NoConstructorFactoryInterface>, static_interfaces<IRuntimeStatics> > Runtime_t;
     typedef use_runtime_class<Runtime_t> Runtime;
 
+    inline std::string StrandId(){ return "cppcomponents_asio_dll!Strand"; }
+
+    typedef runtime_class<StrandId, object_interfaces<IExecutor>> Strand_t;
+    typedef use_runtime_class<Strand_t> Strand;
+
     struct ThreadPoolBoost{
     private:
       bool added_ = false;
