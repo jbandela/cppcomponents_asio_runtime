@@ -73,30 +73,37 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
       assert(s == "Hello World");
 
   }
-void main_async(int i, cppcomponents::awaiter await){
-  
-  using namespace cppcomponents;
-  using namespace asio_runtime;
+  void main_async(int i, cppcomponents::awaiter await){
+
+    using namespace cppcomponents;
+    using namespace asio_runtime;
 
 
-  Runtime::GetThreadPool(1);
+    Runtime::GetThreadPool();
+    Runtime::GetBlockingThreadPool();
+    
 
-  resumable(udp_server)();
-  resumable(udp_client)();
+    resumable(udp_server)();
+    resumable(udp_client)();
 
-  auto eps = await(Tcp::Query("www.google.com", "https", ISocket::Passive | ISocket::AddressConfigured));
-  std::vector<std::string> ipstrings;
-  for (auto& e : eps){
-    ipstrings.push_back(e.address_.ToString());
-  }
-  //auto start = std::chrono::steady_clock::now();
-  //auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ i }));
-  //auto end = std::chrono::steady_clock::now();
-  //std::cout << "Timer finished with error code " << f.ErrorCode() << " after " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "milliseconds \n";
+    auto eps = await(Tcp::Query("www.google.com", "https", ISocket::Passive | ISocket::AddressConfigured));
+    std::vector<std::string> ipstrings;
+    for (auto& e : eps){
+      ipstrings.push_back(e.address_.ToString());
+    }
+    //auto start = std::chrono::steady_clock::now();
+    //auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ i }));
+    //auto end = std::chrono::steady_clock::now();
+    //std::cout << "Timer finished with error code " << f.ErrorCode() << " after " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "milliseconds \n";
 #if 1
-  Tcp socket;
+    TlsContext context{ TlsConstants::Method::Tlsv1 };
+    context.LoadVerifyFile("C:\\Users\\jrb\\Desktop\\cacert.pem");
+    context.SetVerifyMode(TlsConstants::VerifyPeer);
+    TlsStream socket{ context.as<ITlsContext>() };
   
-  await(socket.ConnectQueryRaw("www.google.com", "http", ISocket::Passive | ISocket::AddressConfigured));
+
+  await(socket.LowestLayer().ConnectQueryRaw("www.google.com", "https", ISocket::Passive | ISocket::AddressConfigured));
+  await(socket.Handshake(TlsConstants::HandshakeType::Client));
   std::string resource = "/";
   std::string server = "www.google.com";
   std::string request = "GET " + resource + " HTTP/1.0\r\nHost: " + server + "\r\n\r\n";

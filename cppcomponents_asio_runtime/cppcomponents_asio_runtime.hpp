@@ -111,22 +111,29 @@ namespace cppcomponents{
       bool AddThread();
       bool RemoveThread();
       void Join();
+      bool PollOne();
+      std::int32_t Poll();
 
-      CPPCOMPONENTS_CONSTRUCT(IThreadPool, AddThread, RemoveThread, Join);
+      CPPCOMPONENTS_CONSTRUCT(IThreadPool, AddThread, RemoveThread, Join, PollOne, Poll);
     };
 
+    
 
 
     struct IRuntimeStatics :define_interface<cppcomponents::uuid<0x64d84abd, 0x7333, 0x420b, 0x80ce, 0x9462c191afe7>>
     {
       use<IThreadPool> GetThreadPoolRaw(std::int32_t num_threads, std::int32_t min_threads, std::int32_t max_threads);
+      use<IThreadPool> GetBlockingThreadPoolRaw(std::int32_t num_threads, std::int32_t min_threads, std::int32_t max_threads);
       //use <IIOService> GetIOService();
 
-      CPPCOMPONENTS_CONSTRUCT(IRuntimeStatics, GetThreadPoolRaw);
+      CPPCOMPONENTS_CONSTRUCT(IRuntimeStatics, GetThreadPoolRaw,GetBlockingThreadPoolRaw);
 
       CPPCOMPONENTS_STATIC_INTERFACE_EXTRAS(IRuntimeStatics){
         static use<IThreadPool> GetThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100){
           return Class::GetThreadPoolRaw(num_threads, min_threads, max_threads);
+        }
+        static use<IThreadPool> GetBlockingThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100){
+          return Class::GetBlockingThreadPoolRaw(num_threads, min_threads, max_threads);
         }
       };
     };
@@ -159,7 +166,6 @@ namespace cppcomponents{
     struct IAsyncStream :define_interface<cppcomponents::uuid<0x891a8183, 0xe68d, 0x4265, 0xa108, 0x6b4e0519d254>>{
       Future<std::size_t> Read(simple_buffer buf);
       Future<std::size_t> ReadAt(std::uint64_t offset, simple_buffer buf);
-
       Future<use<IBuffer>> ReadBuffer();
       Future<use<IBuffer>> ReadBufferAt(std::uint64_t offset);
       Future<use<IBuffer>> ReadBufferUntilChar(char c);
@@ -468,7 +474,7 @@ namespace cppcomponents{
       CPPCOMPONENTS_CONSTRUCT(ITlsContextCreator, Create);
     };
 
-    inline std::string TlsContextId(){ return "cppcomponents_asio_runtime!TlsContext"; }
+    inline std::string TlsContextId(){ return "cppcomponents_asio_dll!TlsContext"; }
 
     typedef runtime_class < TlsContextId, object_interfaces<ITlsContext>,
       factory_interface < ITlsContextCreator >> TlsContext_t;
@@ -491,7 +497,7 @@ namespace cppcomponents{
       CPPCOMPONENTS_CONSTRUCT(ITlsStreamCreator, Create);
     };
 
-    inline std::string TlsStreamId(){ return "cppcomponents_asio_runtime!TlsContext"; }
+    inline std::string TlsStreamId(){ return "cppcomponents_asio_dll!TlsStream"; }
 
     typedef runtime_class < TlsStreamId, object_interfaces<ITlsStream>,
       factory_interface<ITlsStreamCreator>> TlsStream_t;

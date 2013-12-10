@@ -2,6 +2,9 @@
 #define ASIO_STANDALONE 1
 #include "external_dependencies/asio.hpp"
 #include <cppcomponents/implementation/spinlock.hpp>
+#include <cppcomponents/implementation/queue.hpp>
+#include <mutex>
+#include <condition_variable>
 
 using namespace cppcomponents;
 using namespace cppcomponents::asio_runtime;
@@ -101,6 +104,199 @@ struct io_service_runner{
 
 
 };
+struct blocking_thread_pool_runner{
+  std::atomic<bool> should_stop_ = { false };
+  std::atomic<bool> stop_if_no_work_ = { false };
+  typedef delegate<void()> ClosureType;
+  low_lock_queue < use<ClosureType> >* pqueue_;
+  std::mutex* pmut_;
+  std::condition_variable* pcvar_;
+  std::thread t_;
+
+  bool wait_until_post(){
+    std::unique_lock<std::mutex> lock{ *pmut_ };
+    bool should_stop = false;
+    bool stop_if_no_work = false;
+    bool qempty = false;
+
+    pcvar_->wait(lock,[&]()->bool{
+      should_stop = should_stop_.load();
+      stop_if_no_work = stop_if_no_work_.load();
+      qempty = pqueue_->empty();
+
+      if (qempty == false || should_stop || (stop_if_no_work && qempty)){
+        return true;
+      }
+      else{
+        return false;
+      }
+    });
+
+    if (should_stop) return false;
+    if (qempty == false) return true;
+    if (stop_if_no_work && qempty) return false;
+  }
+
+
+
+  void thread_func(){
+   for(;;){
+        if (should_stop_.load() == true){
+          return;
+        }
+      use<ClosureType> closure;
+      pqueue_->consume(closure);
+      if (closure){
+        closure();
+      }
+      else{
+        if (stop_if_no_work_.load() == true){
+          return;
+        }
+        else{
+          if (wait_until_post() == false){
+            return;
+          }
+        }
+      }
+
+    }
+
+  }
+
+
+
+  blocking_thread_pool_runner(low_lock_queue < use<ClosureType> >* pqueue,
+  std::mutex* pmut, std::condition_variable* pcvar)
+  :pqueue_{ pqueue }, pmut_{ pmut }, pcvar_{ pcvar }, t_{ std::bind(&blocking_thread_pool_runner::thread_func, this) }
+  {}
+
+  void stop_when_no_work(){
+    stop_if_no_work_.store(true);
+    pcvar_->notify_all();
+  }
+
+  void join_when_no_work(){
+    stop_when_no_work();
+    if (t_.joinable()) t_.join();
+  }
+
+  void join(){
+    if (t_.joinable()) t_.join();
+  }
+
+  ~blocking_thread_pool_runner(){
+    should_stop_.store(true);
+    pcvar_->notify_all();
+
+    // Wait for the thread to stop
+    if (t_.joinable()) t_.join();
+  }
+
+
+};
+
+inline std::string BlockingThreadPoolId(){ return "cppcomponents_asio_dll!BlockingThreadPoolId"; }
+typedef runtime_class<BlockingThreadPoolId, factory_interface<NoConstructorFactoryInterface>, object_interfaces<IThreadPool> > BlockingThreadPool_t;
+
+struct ImplementBlockingThreadPool :implement_runtime_class<ImplementBlockingThreadPool, BlockingThreadPool_t>
+{
+
+  typedef delegate<void()> ClosureType;
+  std::atomic<bool> lock_ = {false};
+  low_lock_queue<use<ClosureType>> queue_;
+  std::mutex mut_;
+  std::condition_variable cvar_;
+  std::atomic<bool> should_stop_when_done_;
+  std::vector<std::unique_ptr<blocking_thread_pool_runner>> threads_;
+  std::int32_t max_threads_;
+  std::int32_t min_threads_;
+
+  void AddDelegate(use<ClosureType> f){
+    queue_.produce(f);
+    cvar_.notify_one();
+  }
+  std::size_t NumPendingClosures(){
+
+    return 65536;
+  }
+
+  void add_thread_helper(){
+      std::unique_ptr<blocking_thread_pool_runner> ptr{ new blocking_thread_pool_runner{ &queue_, &mut_, &cvar_ } };
+      threads_.push_back(std::move(ptr));
+
+  }
+  bool AddThread(){
+    spin_locker l{ lock_ };
+    if (threads_.size() < max_threads_){
+      add_thread_helper();
+      return true;
+
+    }
+    else{
+      return false;
+    }
+  }
+  bool RemoveThread(){
+    spin_locker l{ lock_ };
+    if (threads_.size() > min_threads_){
+      threads_.pop_back();
+      return true;
+    }
+    else{
+      return false;
+    }
+  }
+
+  void Join(){
+    spin_locker l{ lock_ };
+    // Wait for tasks to finish
+    for (auto& t : threads_){
+      t->stop_when_no_work();
+    }
+    cvar_.notify_all();
+    // Wait for tasks to finish
+    for (auto& t : threads_){
+      t->join();
+    }
+
+    threads_.clear();
+  }
+  
+  bool PollOne(){
+    use<ClosureType> closure;
+    queue_.consume(closure);
+    if (closure){
+      closure();
+      return true;
+    }
+    else{
+      return false;
+    }
+  }
+  std::int32_t Poll(){
+    std::int32_t count = 0;
+    while (PollOne()){
+      ++count;
+    }
+    return count;
+  }
+  ImplementBlockingThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100)
+    :min_threads_{ min_threads }, max_threads_{ max_threads }
+  {
+    if (num_threads == -1){
+      num_threads = std::thread::hardware_concurrency()*10;
+      if (num_threads == 0) num_threads = min_threads;
+    }
+    if (num_threads < min_threads_){ min_threads_ = num_threads; }
+    if (num_threads > max_threads_){ max_threads_ = num_threads; }
+    for (int i = 0; i < num_threads; ++i){
+      add_thread_helper();
+    }
+  }
+
+};
+
 
 struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>{
   std::atomic<bool> lock_ = { false };
@@ -163,6 +359,13 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
     assert(io_service_.stopped());
   }
 
+  std::int32_t IThreadPool_Poll(){
+    return io_service_.poll();
+  }
+
+  bool IThreadPool_PollOne(){
+    return (io_service_.poll_one() != 0);
+  }
   ImplementRuntime(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100)
     :min_threads_{ min_threads }, max_threads_{max_threads}
   {
@@ -191,11 +394,23 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
     }
 
   };
+  struct BlockingTPInitializer{
+    use<IThreadPool> pool_;
+    BlockingTPInitializer(std::int32_t num_threads, std::int32_t min_threads, std::int32_t max_threads)
+    {
+      pool_ = ImplementBlockingThreadPool::create(num_threads, min_threads, max_threads).QueryInterface<IThreadPool>();
+    }
+
+  };
 
   static   use<IThreadPool> GetThreadPoolRaw(std::int32_t num_threads, std::int32_t min_threads, std::int32_t max_threads){
     return cross_compiler_interface::detail::safe_static_init<TPInitializer, ImplementRuntime>::get(num_threads, min_threads, max_threads).pool_;
   }
+  static   use<IThreadPool> GetBlockingThreadPoolRaw(std::int32_t num_threads, std::int32_t min_threads, std::int32_t max_threads){
+    return cross_compiler_interface::detail::safe_static_init<BlockingTPInitializer, ImplementRuntime>::get(num_threads, min_threads, max_threads).pool_;
+  }
 
+  
 
 
   void* GetImplementationRaw(){ return this; }
@@ -673,7 +888,7 @@ struct ImplementAsyncStreamHelper{
     socket().async_read_some(asio::null_buffers{},
       [p](const asio::error_code& ec, std::size_t bytes_transferred){
       try{
-        if (ec && !(ec == asio::error::eof && bytes_transferred)){
+        if (ec){
           p.SetError(ec.value());
         }
         else{
@@ -1201,6 +1416,7 @@ struct ImplementTlsStream :implement_runtime_class<ImplementTlsStream, TlsStream
 
 };
 
+CPPCOMPONENTS_REGISTER(ImplementTlsStream)
 
 CPPCOMPONENTS_DEFINE_FACTORY()
 
