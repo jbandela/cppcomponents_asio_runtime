@@ -131,6 +131,6 @@ int main(){
 
   std::cin >> i;
 
-  cppcomponents::asio_runtime::Runtime::GetThreadPool().Join();
+  //cppcomponents::asio_runtime::Runtime::GetThreadPool().Join();
 
 }
