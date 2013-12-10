@@ -407,6 +407,96 @@ namespace cppcomponents{
     typedef runtime_class<UdpId, object_interfaces<ISocket, IAsyncDatagram>, static_interfaces<IQueryStatic>> Udp_t;
     typedef use_runtime_class<Udp_t> Udp;
 
+
+    // Support for TLS
+    namespace TlsConstants{
+      enum FileFormat{Asn = 0,Pem = 1};
+      enum VerifyMode{VerifyNone,VerifyPeer,VerifyFailIfNoPeerCert,VerifyClientOnce};
+      enum Method{
+        Sslv2,
+        Sslv2Client,
+        Sslv2Server,
+        Sslv3,
+        sslv3Client,
+        Sslv3Server,
+        Tlsv1,
+        Tlsv1Client,
+        Tlsv1Server,
+        Sslv23,
+        Sslv23Client,
+        Sslv23Server,
+        Tlsv11,
+        Tlsv11Client,
+        Tlsv11Server,
+        Tlsv12,
+        Tlsv12Client,
+        Tlsv12Server
+
+      };
+
+      enum HandshakeType{
+        Client,
+        Server
+      };
+    };
+    struct ITlsContext :define_interface<cppcomponents::uuid<0x62049bda, 0x84a8, 0x4aef, 0xba25, 0x6af244737e54>>
+    {
+      typedef delegate<std::string(std::size_t len, std::int32_t purpose)> PasswordCallback;
+      void AddVerifyPath(cr_string path);
+      void LoadVerifyFile(cr_string path);
+      void SetDefaultVerifyPaths();
+      void SetOptions(std::int32_t options);
+      void SetPasswordCallback(use<PasswordCallback> cb);
+      void EnableRfc2818Verification(cr_string host);
+      void SetVerifyMode(std::int32_t mode);
+      void UseCertificateChainFile(cr_string path);
+      void UseCertificateFile(cr_string path,std::int32_t format);
+      void UsePrivateKeyFile(cr_string path, std::int32_t format);
+      void UseRsaPrivateKeyFile(cr_string path,std::int32_t format);
+      void UseTmpDhFile(cr_string path);
+     
+      CPPCOMPONENTS_CONSTRUCT(ITlsContext, AddVerifyPath,
+        LoadVerifyFile, SetDefaultVerifyPaths, SetOptions, SetPasswordCallback,
+        EnableRfc2818Verification, SetVerifyMode, UseCertificateChainFile,
+        UseCertificateFile, UsePrivateKeyFile, UseRsaPrivateKeyFile, UseTmpDhFile);
+    };
+
+    struct ITlsContextCreator :define_interface<cppcomponents::uuid<0x66bf83c2, 0x868c, 0x4bd5, 0xa233, 0xae2e9049ca5d>>
+    {
+      use<InterfaceUnknown> Create(std::int32_t method);
+
+      CPPCOMPONENTS_CONSTRUCT(ITlsContextCreator, Create);
+    };
+
+    inline std::string TlsContextId(){ return "cppcomponents_asio_runtime!TlsContext"; }
+
+    typedef runtime_class < TlsContextId, object_interfaces<ITlsContext>,
+      factory_interface < ITlsContextCreator >> TlsContext_t;
+    typedef use_runtime_class<TlsContext_t> TlsContext;
+
+    struct ITlsStream :define_interface<cppcomponents::uuid<0x033138fe, 0x7a24, 0x454f, 0xa8dd, 0xd02030ef8a58>,
+      IAsyncStream>
+    {
+      Future<void> Handshake(std::int32_t type);
+      Future<void> Shutdown();
+      use<ISocket> LowestLayer();
+
+      CPPCOMPONENTS_CONSTRUCT(ITlsStream, Handshake, Shutdown, LowestLayer);
+    };
+
+    struct ITlsStreamCreator :define_interface<cppcomponents::uuid<0xbd929169, 0xde01, 0x4bf6, 0x8739, 0xd92794fa44a3>>
+    {
+      use<InterfaceUnknown> Create(use<ITlsContext>);
+
+      CPPCOMPONENTS_CONSTRUCT(ITlsStreamCreator, Create);
+    };
+
+    inline std::string TlsStreamId(){ return "cppcomponents_asio_runtime!TlsContext"; }
+
+    typedef runtime_class < TlsStreamId, object_interfaces<ITlsStream>,
+      factory_interface<ITlsStreamCreator>> TlsStream_t;
+    typedef use_runtime_class<TlsStream_t> TlsStream;
+
   }
 
   template<>
