@@ -336,7 +336,9 @@ namespace cppcomponents{
       void Close();
       void GetOptionRaw(int level, int option_name, void* option_value, std::size_t option_len);
       void SetOptionRaw(int level, int option_name, const void* option_value, std::size_t option_len);
+      void IOControlRaw(int name, void* data);
       bool IsOpen();
+      endpoint LocalEndpoint();
       int NativeHandle();
       bool GetNonBlocking();
       void SetNonBlocking(bool);
@@ -347,8 +349,8 @@ namespace cppcomponents{
       void Shutdown(std::int32_t type);
 
       CPPCOMPONENTS_CONSTRUCT(ISocket, AssignRaw, Connect, ConnectQueryRaw, AtMark,
-        Available, Bind, Cancel, Close, GetOptionRaw, SetOptionRaw,
-        IsOpen, NativeHandle, GetNonBlocking, SetNonBlocking, GetNativeNonBlocking,
+        Available, Bind, Cancel, Close, GetOptionRaw, SetOptionRaw,IOControlRaw,
+        IsOpen, LocalEndpoint, NativeHandle, GetNonBlocking, SetNonBlocking, GetNativeNonBlocking,
         SetNativeNonBlocking, OpenRaw, RemoteEndpoint, Shutdown);
 
 
@@ -523,6 +525,24 @@ namespace cppcomponents{
     typedef use_runtime_class<TlsStream_t> TlsStream;
 
   }
+
+  // Support for Signal Sets
+  struct ISignalSet :define_interface<cppcomponents::uuid<0xb1d72883, 0x05ab, 0x41b5, 0x8a44, 0x51e6090c0a3b>>
+  {
+    void Add(int signal_number);
+    Future<int> Wait();
+    void Cancel();
+    void Clear();
+    void Remove(int signal_number);
+
+    CPPCOMPONENTS_CONSTRUCT(ISignalSet, Add, Wait, Cancel, Clear, Remove);
+
+  };
+
+  inline std::string SignalSetId(){ return "cppcomponents_asio_dll!SignalSet"; }
+  typedef runtime_class<SignalSetId, object_interfaces<ISignalSet>> SignalSet_t;
+  typedef use_runtime_class<SignalSet_t> SignalSet;
+
 
   template<>
   struct uuid_of<asio_runtime::simple_buffer>{

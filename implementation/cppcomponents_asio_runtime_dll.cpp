@@ -138,6 +138,9 @@ struct blocking_thread_pool_runner{
     if (should_stop) return false;
     if (qempty == false) return true;
     if (stop_if_no_work && qempty) return false;
+
+    assert(false);
+    return false;
   }
 
 
@@ -212,8 +215,8 @@ struct ImplementBlockingThreadPool :implement_runtime_class<ImplementBlockingThr
   std::condition_variable cvar_;
   std::atomic<bool> should_stop_when_done_;
   std::vector<std::unique_ptr<blocking_thread_pool_runner>> threads_;
-  std::int32_t max_threads_;
-  std::int32_t min_threads_;
+  std::uint32_t max_threads_;
+  std::uint32_t min_threads_;
 
   void AddDelegate(use<ClosureType> f){
     queue_.produce(f);
@@ -284,16 +287,17 @@ struct ImplementBlockingThreadPool :implement_runtime_class<ImplementBlockingThr
     }
     return count;
   }
-  ImplementBlockingThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100)
+  ImplementBlockingThreadPool(std::int32_t signed_num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100)
     :min_threads_{ min_threads }, max_threads_{ max_threads }
   {
-    if (num_threads == -1){
+    std::uint32_t num_threads = 0;
+    if (signed_num_threads == -1){
       num_threads = std::thread::hardware_concurrency()*10;
       if (num_threads == 0) num_threads = min_threads;
     }
     if (num_threads < min_threads_){ min_threads_ = num_threads; }
     if (num_threads > max_threads_){ max_threads_ = num_threads; }
-    for (int i = 0; i < num_threads; ++i){
+    for (unsigned int i = 0; i < num_threads; ++i){
       add_thread_helper();
     }
   }
@@ -305,9 +309,9 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
   std::atomic<bool> lock_ = { false };
   asio::io_service io_service_;
   std::vector<std::unique_ptr<io_service_runner>> threads_;
-  std::int32_t min_threads_;
-  std::int32_t max_threads_;
-  std::int32_t initial_threads_;
+  std::uint32_t min_threads_;
+  std::uint32_t max_threads_;
+  std::uint32_t initial_threads_;
   typedef cppcomponents::delegate < void() > ClosureType;
 
   asio::io_service& io(){ return io_service_; }
@@ -369,17 +373,18 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
   bool IThreadPool_PollOne(){
     return (io_service_.poll_one() != 0);
   }
-  ImplementRuntime(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100)
+  ImplementRuntime(std::int32_t signed_num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100)
     :min_threads_{ min_threads }, max_threads_{max_threads}
   {
-    if (num_threads == -1){
+    std::uint32_t num_threads = 0;
+    if (signed_num_threads == -1){
       num_threads = std::thread::hardware_concurrency();
       if (num_threads == 0) num_threads = min_threads;
     }
     if (num_threads < min_threads_){ min_threads_ = num_threads; }
     if (num_threads > max_threads_){ max_threads_ = num_threads; }
     initial_threads_ = num_threads;
-    for (int i = 0; i < num_threads; ++i){
+    for (unsigned int i = 0; i < num_threads; ++i){
       std::unique_ptr<io_service_runner> ptr{ new io_service_runner{&io_service_, true } };
       threads_.push_back(std::move(ptr));
     }
@@ -631,6 +636,13 @@ struct settable_option{
   }
 };
 
+struct io_control_command{
+  int name_;
+  void* data_;
+  int name(){ return name_; }
+  void* data(){ return data_; }
+};
+
 
 typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream, IGetImplementation>, static_interfaces<IQueryStatic>> Tcp_t1;
 
@@ -641,13 +653,12 @@ template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelp
 
   Socket& socket(){ return derived()->socket_; }
 
-
   void AssignRaw(std::int32_t ip_type, std::uint64_t s){
     if (ip_type == 4){
-      socket().assign(UdpOrTcp::v4(), s);
+      socket().assign(UdpOrTcp::v4(), static_cast<asio::detail::socket_type>(s));
     }
     else if (ip_type = 6){
-      socket().assign(UdpOrTcp::v6(), s);
+      socket().assign(UdpOrTcp::v6(), static_cast<asio::detail::socket_type>(s));
 
     }
 
@@ -777,12 +788,7 @@ template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelp
     return socket().available();
   }
   void Bind(endpoint e){
-    try{
       return socket().bind(typename UdpOrTcp::endpoint(get_address(e.address_), e.port_));
-    }
-    catch (asio::system_error& e){
-      auto msg = e.what();
-    }
   }
   void Cancel(){
     socket().cancel();
@@ -813,6 +819,12 @@ template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelp
   bool IsOpen(){
     return socket().is_open();
   }
+  void IOControlRaw(int name, void* data){
+    io_control_command cmd;
+    cmd.name_ = name;
+    cmd.data_ = data;
+    socket().io_control(cmd);
+  }
   int NativeHandle(){
     return socket().native_handle();
   }
@@ -840,9 +852,13 @@ template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelp
     }
   }
 
+  endpoint LocalEndpoint(){
+    auto ep = socket().local_endpoint();
+    return endpoint{ ImplementIPAddress::create(ep.address()).template QueryInterface<IIPAddress>(), ep.port() };
+  }
   endpoint RemoteEndpoint(){
     auto ep = socket().remote_endpoint();
-    return endpoint{ImplementIPAddress::create(ep.address()).template QueryInterface<IIPAddress>(), ep.port() };
+    return endpoint{ ImplementIPAddress::create(ep.address()).template QueryInterface<IIPAddress>(), ep.port() };
   }
 
   void Shutdown(std::int32_t type){
@@ -1510,6 +1526,55 @@ struct ImplementTlsStream :implement_runtime_class<ImplementTlsStream, TlsStream
 };
 
 CPPCOMPONENTS_REGISTER(ImplementTlsStream)
+
+
+// Signal Set
+struct ImplementSignalSet :implement_runtime_class<ImplementSignalSet, SignalSet_t>{
+  asio::signal_set set_;
+  
+  void Add(int signal_number){
+    set_.add(signal_number);
+  }
+  Future<int> Wait(){
+    asio::detail::system_category c;
+    auto msg = c.message(995);
+    auto p = make_promise<int>();
+    set_.async_wait([p](
+      const asio::error_code& error, // Result of operation.
+      int signal_number // Indicates which signal occurred.
+      ){
+      try{
+        if (error){
+          auto msg = error.message();
+          p.SetError(error.value());
+
+        }
+        else{
+          p.Set(signal_number);
+        }
+      }
+      catch (std::exception& e){
+        p.SetError(error_mapper::error_code_from_exception(e));
+      }
+    });
+
+    return p.QueryInterface<IFuture<int>>();
+  }
+  void Cancel(){
+    set_.cancel();
+  }
+  void Clear(){
+    set_.clear();
+  }
+  void Remove(int signal_number){
+    set_.remove(signal_number);
+  }
+
+  ImplementSignalSet() :set_{ get_io() }{}
+
+};
+
+CPPCOMPONENTS_REGISTER(ImplementSignalSet)
 
 CPPCOMPONENTS_DEFINE_FACTORY()
 

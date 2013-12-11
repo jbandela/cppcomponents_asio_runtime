@@ -91,14 +91,15 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
     for (auto& e : eps){
       ipstrings.push_back(e.address_.ToString());
     }
-    //auto start = std::chrono::steady_clock::now();
-    //auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ i }));
-    //auto end = std::chrono::steady_clock::now();
-    //std::cout << "Timer finished with error code " << f.ErrorCode() << " after " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "milliseconds \n";
+    auto start = std::chrono::steady_clock::now();
+    auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ 50 }));
+    auto end = std::chrono::steady_clock::now();
+    std::cout << "Timer finished with error code " << f.ErrorCode() << " after " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "milliseconds \n";
 #if 1
     TlsContext context{ TlsConstants::Method::Tlsv1 };
     context.LoadVerifyFile("C:\\Users\\jrb\\Desktop\\cacert.pem");
     context.SetVerifyMode(TlsConstants::VerifyPeer);
+    context.EnableRfc2818Verification("www.google.com");
     TlsStream socket{ context.as<ITlsContext>() };
   
 
@@ -127,7 +128,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
     cppcomponents::async(cppcomponents::asio_runtime::Runtime::GetThreadPool(),std::bind(cppcomponents::resumable(print_connection),is.QueryInterface<IAsyncStream>()));
   }
 }
-
+#include <signal.h>
 int main(){
   int i = 0;
   //std::cout << "Enter wait time in milliseconds\n";
@@ -136,6 +137,23 @@ int main(){
     std::cout << "Finished with " << f.ErrorCode() << "\n";
   });
 
+  using namespace cppcomponents;
+  using namespace cppcomponents::asio_runtime;
+  SignalSet s;
+  s.Add(SIGINT);
+  std::atomic<bool> done{ false };
+  s.Wait().Then([&](Future<int> f){
+    if (f.ErrorCode()){
+      std::cout << "Signal error code " <<  f.ErrorCode() << std::endl;
+    }
+    else{
+      std::cout << "Signal received " << f.Get() << std::endl;
+    }
+    done.store(true);
+  });
+  while (!done.load()){
+    std::this_thread::yield();
+  }
   std::cin >> i;
 
   //cppcomponents::asio_runtime::Runtime::GetThreadPool().Join();
