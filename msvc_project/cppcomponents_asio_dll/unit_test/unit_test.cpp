@@ -31,7 +31,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
     strstream << "\r\n\r\n";
 
     auto s = strstream.str();
-    await(is.Write(cppcomponents::asio_runtime::const_simple_buffer{ &s[0], s.size() }));
+    await(is.WriteRaw(cppcomponents::asio_runtime::const_simple_buffer{ &s[0], s.size() }));
   }
 
 
@@ -107,7 +107,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
   std::string resource = "/";
   std::string server = "www.google.com";
   std::string request = "GET " + resource + " HTTP/1.0\r\nHost: " + server + "\r\n\r\n";
-  await(socket.Write(const_simple_buffer(&request[0], request.size())));
+  await(socket.WriteRaw(const_simple_buffer(&request[0], request.size())));
   while (true){
    
     auto fut = await.as_future(socket.ReadBuffer());

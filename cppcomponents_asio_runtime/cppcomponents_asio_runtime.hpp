@@ -164,21 +164,40 @@ namespace cppcomponents{
     };
 
     struct IAsyncStream :define_interface<cppcomponents::uuid<0x891a8183, 0xe68d, 0x4265, 0xa108, 0x6b4e0519d254>>{
-      Future<std::size_t> Read(simple_buffer buf);
-      Future<std::size_t> ReadAt(std::uint64_t offset, simple_buffer buf);
+      Future<std::size_t> ReadRaw(simple_buffer buf);
+      Future<std::size_t> ReadExactly(simple_buffer buf, std::size_t len);
+
       Future<use<IBuffer>> ReadBuffer();
-      Future<use<IBuffer>> ReadBufferAt(std::uint64_t offset);
       Future<use<IBuffer>> ReadBufferUntilChar(char c);
       Future<use<IBuffer>> ReadBufferUntilString(cr_string delim);
+      Future<use<IBuffer>> ReadBufferUntilRegex(cr_string regex);
+      Future<use<IBuffer>> ReadBufferExactly(std::size_t len);
 
-      Future<void> Poll();
 
-      Future<std::size_t> Write(const_simple_buffer data);
-      Future<std::size_t> WriteAt(std::uint64_t offset, const_simple_buffer data);
+      Future<void> ReadPoll();
 
-      CPPCOMPONENTS_CONSTRUCT(IAsyncStream, Read, ReadAt, 
-        ReadBuffer, ReadBufferAt, ReadBufferUntilChar, ReadBufferUntilString,Poll,Write,WriteAt);
+      Future<std::size_t> WriteRaw(const_simple_buffer data);
 
+      Future<void> WritePoll();
+
+
+      CPPCOMPONENTS_CONSTRUCT(IAsyncStream, ReadRaw, ReadExactly, 
+        ReadBuffer, ReadBufferUntilChar, ReadBufferUntilString,
+        ReadBufferUntilRegex, ReadBufferExactly, ReadPoll, WriteRaw, WritePoll);
+
+    };
+
+    struct IAsyncRandom :define_interface<cppcomponents::uuid<0x7a94adfb, 0x25c3, 0x4e34, 0x81ca, 0x8d4440943fde>>
+    {
+      Future<std::size_t> ReadAtRaw(std::uint64_t offset, simple_buffer buf);
+      Future<std::size_t> ReadAtExactly(std::uint64_t offset, simple_buffer buf,std::size_t len);
+
+      Future<use<IBuffer>> ReadBufferAt(std::uint64_t offset);
+      Future<use<IBuffer>> ReadBufferAtExactly(std::uint64_t offset,std::size_t len);
+
+      Future<std::size_t> WriteAtRaw(std::uint64_t offset, const_simple_buffer data);
+
+      CPPCOMPONENTS_CONSTRUCT(IAsyncRandom, ReadAtRaw, ReadAtExactly, ReadBufferAt, ReadBufferAtExactly, WriteAtRaw)
     };
 
 

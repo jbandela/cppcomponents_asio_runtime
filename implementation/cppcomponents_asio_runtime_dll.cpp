@@ -1,10 +1,13 @@
 #include "../cppcomponents_asio_runtime/cppcomponents_asio_runtime.hpp"
 #define ASIO_STANDALONE 1
+#define ASIO_HAS_BOOST_REGEX 1
 #include "external_dependencies/asio.hpp"
 #include <cppcomponents/implementation/spinlock.hpp>
 #include <cppcomponents/implementation/queue.hpp>
 #include <mutex>
 #include <condition_variable>
+#include <boost/regex.hpp>
+
 
 using namespace cppcomponents;
 using namespace cppcomponents::asio_runtime;
@@ -861,29 +864,60 @@ template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelp
 
 
 };
-
+void process_read(Promise<std::size_t> p,
+  const asio::error_code& ec, std::size_t bytes_transferred){
+  try{
+    if (ec){
+      p.SetError(ec.value());
+    }
+    else{
+      p.Set(bytes_transferred);
+    }
+  }
+  catch (std::exception& e){
+    p.SetError(error_mapper::error_code_from_exception(e));
+  }
+}
+void process_streambuf_read(Promise<use<IBuffer>> p, std::shared_ptr<asio::streambuf> spbuf,
+  const asio::error_code& ec, std::size_t bytes_transferred){
+  if (ec){
+    auto msg = ec.message();
+    p.SetError(ec.value());
+  }
+  else{
+    try{
+      auto sz = asio::buffer_size(spbuf->data());
+      auto ib = Buffer::Create(sz);
+      ib.SetSize(sz);
+      asio::buffer_copy(asio::buffer(ib.Begin(), sz), spbuf->data());
+      p.Set(ib);
+    }
+    catch (std::exception& e){
+      p.SetError(error_mapper::error_code_from_exception(e));
+    }
+  }
+}
+void process_write(Promise<std::size_t> p, const asio::error_code& error, std::size_t bytes_written){
+  try{
+    if (error){
+      p.SetError(error.value());
+    }
+    else{
+      p.Set(bytes_written);
+    }
+  }
+  catch (std::exception& e){
+    p.SetError(error_mapper::error_code_from_exception(e));
+  }
+}
 template<class Derived, class Socket>
 struct ImplementAsyncStreamHelper{
   Derived* derived(){ return static_cast<Derived*>(this); }
 
   Socket& socket(){ return derived()->socket_; }
 
-  static void process_read(Promise<std::size_t> p,
-  const asio::error_code& ec, std::size_t bytes_transferred){
-    try{
-      if (ec){
-        p.SetError(ec.value());
-      }
-      else{
-        p.Set(bytes_transferred);
-      }
-    }
-    catch (std::exception& e){
-      p.SetError(error_mapper::error_code_from_exception(e));
-    }
-  }
 
-  Future<void> IAsyncStream_Poll(){
+  Future<void> IAsyncStream_ReadPoll(){
     auto p = make_promise<void>();
     socket().async_read_some(asio::null_buffers{},
       [p](const asio::error_code& ec, std::size_t bytes_transferred){
@@ -903,9 +937,9 @@ struct ImplementAsyncStreamHelper{
 
   }
 
-  Future<std::size_t> IAsyncStream_Read(simple_buffer buf){
+  Future<std::size_t> IAsyncStream_ReadRaw(simple_buffer buf){
     auto p = make_promise<std::size_t>();
-    socket().async_read_some(asio::buffer(buf.begin(), buf.size()),
+    asio::async_read(socket(), asio::buffer(buf.begin(), buf.size()), asio::transfer_at_least(1),
       std::bind(&process_read, p, std::placeholders::_1, std::placeholders::_2));
     return p.QueryInterface<IFuture<std::size_t>>();
   }
@@ -913,25 +947,15 @@ struct ImplementAsyncStreamHelper{
     return IAsyncStream_Read(buf);
   }
 
-  static void process_streambuf_read(Promise<use<IBuffer>> p, std::shared_ptr<asio::streambuf> spbuf,
-    const asio::error_code& ec, std::size_t bytes_transferred){
-    if (ec){
-      auto msg = ec.message();
-      p.SetError(ec.value());
-    }
-    else{
-      try{
-        auto sz = asio::buffer_size(spbuf->data());
-        auto ib = Buffer::Create(sz);
-        ib.SetSize(sz);
-        asio::buffer_copy(asio::buffer(ib.Begin(), sz), spbuf->data());
-        p.Set(ib);
-      }
-      catch (std::exception& e){
-        p.SetError(error_mapper::error_code_from_exception(e));
-      }
-    }
+  Future<std::size_t> IAsyncStream_ReadExactly(simple_buffer buf, std::size_t len){
+    if (buf.size() < len) throw error_invalid_arg();
+    auto p = make_promise<std::size_t>();
+    asio::async_read(socket(), asio::buffer(buf.begin(), buf.size()), asio::transfer_exactly(len),
+      std::bind(&process_read, p, std::placeholders::_1, std::placeholders::_2));
+    return p.QueryInterface<IFuture<std::size_t>>();
   }
+
+
 
   Future<use<IBuffer>> IAsyncStream_ReadBuffer(){
     auto p = make_promise<use<IBuffer>>();
@@ -941,9 +965,7 @@ struct ImplementAsyncStreamHelper{
       std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
     return p.QueryInterface<IFuture<use<IBuffer>>>();
   }
-  Future<use<IBuffer>> IAsyncStream_ReadBufferAt(std::uint64_t offset){
-    return IAsyncStream_ReadBuffer();
-  }
+
   Future<use<IBuffer>> IAsyncStream_ReadBufferUntilChar(char c){
     auto p = make_promise<use<IBuffer>>();
     std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
@@ -960,31 +982,102 @@ struct ImplementAsyncStreamHelper{
     return p.QueryInterface<IFuture<use<IBuffer>>>();
 
   }
+  Future<use<IBuffer>> IAsyncStream_ReadBufferUntilRegex(cr_string regex){
+    auto p = make_promise<use<IBuffer>>();
+    std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
 
-  static void process_write(Promise<std::size_t> p, const asio::error_code& error, std::size_t bytes_written){
-    try{
-      if (error){
-        p.SetError(error.value());
-      }
-      else{
-        p.Set(bytes_written);
-      }
-    }
-    catch (std::exception& e){
-      p.SetError(error_mapper::error_code_from_exception(e));
-    }
+    asio::async_read_until(socket(), *spbuf, boost::regex{ regex.begin(), regex.end() }, std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
+    return p.QueryInterface<IFuture<use<IBuffer>>>();
+
+  }
+  Future<use<IBuffer>> IAsyncStream_ReadBufferExactly(std::size_t len){
+    auto p = make_promise<use<IBuffer>>();
+    std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
+
+    asio::async_read(socket(), *spbuf, asio::transfer_exactly(len),
+      std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
+    return p.QueryInterface<IFuture<use<IBuffer>>>();
   }
 
-  Future<std::size_t> IAsyncStream_Write(const_simple_buffer data){
+
+
+
+  Future<std::size_t> IAsyncStream_WriteRaw(const_simple_buffer data){
     using namespace std::placeholders;
     auto p = make_promise<std::size_t>();
     asio::async_write(socket(), asio::buffer(data.begin(), data.size()), std::bind(&process_write, p, _1, _2));
     return p.QueryInterface<IFuture<std::size_t>>();
   }
+  Future<void> IAsyncStream_WritePoll(){
+    auto p = make_promise<void>();
+    socket().async_write_some(asio::null_buffers{},
+      [p](const asio::error_code& ec, std::size_t bytes_transferred){
+      try{
+        if (ec){
+          p.SetError(ec.value());
+        }
+        else{
+          p.Set();
+        }
+      }
+      catch (std::exception& e){
+        p.SetError(error_mapper::error_code_from_exception(e));
+      }
+    });
+    return p.QueryInterface<IFuture<void>>();
+
+  }
+
   Future<std::size_t> IAsyncStream_WriteAt(std::uint64_t offset, const_simple_buffer data){
     return IAsyncStream_Write(data);
   }
 };
+
+template<class Derived, class Socket>
+struct ImplementAsyncRandomHelper{
+
+    Derived* derived(){ return static_cast<Derived*>(this); }
+
+    Socket& socket(){ return derived()->socket_; }
+    Future<std::size_t> IAsyncStream_ReadAtRaw(std::uint64_t offset, simple_buffer buf){
+      auto p = make_promise<std::size_t>();
+      asio::async_read_at(socket(), offset, asio::buffer(buf.begin(), buf.size()), asio::transfer_at_least(1),
+        std::bind(&process_read, p, std::placeholders::_1, std::placeholders::_2));
+      return p.QueryInterface<IFuture<std::size_t>>();
+    }
+    Future<std::size_t> IAsyncStream_ReadAtExactly(std::uint64_t offset, simple_buffer buf,std::size_t len){
+      auto p = make_promise<std::size_t>();
+      asio::async_read_at(socket(), offset, asio::buffer(buf.begin(), buf.size()), asio::transfer_exactly(len),
+        std::bind(&process_read, p, std::placeholders::_1, std::placeholders::_2));
+      return p.QueryInterface<IFuture<std::size_t>>();
+    }
+
+    Future<use<IBuffer>> IAsyncStream_ReadBufferAt(std::uint64_t offset){
+      auto p = make_promise<use<IBuffer>>();
+      std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
+
+      asio::async_read_at(socket(),offset, *spbuf, asio::transfer_at_least(1),
+        std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
+      return p.QueryInterface<IFuture<use<IBuffer>>>();
+    }
+    Future<use<IBuffer>> IAsyncStream_ReadBufferAtExactly(std::uint64_t offset, std::size_t len){
+      auto p = make_promise<use<IBuffer>>();
+      std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
+
+      asio::async_read_at(socket(),offset, *spbuf, asio::transfer_exactly(len),
+        std::bind(&process_streambuf_read, p, spbuf, std::placeholders::_1, std::placeholders::_2));
+      return p.QueryInterface<IFuture<use<IBuffer>>>();
+    }
+
+    Future<std::size_t> IAsyncRandom_WriteAtRaw(std::uint64_t offset,const_simple_buffer data){
+      using namespace std::placeholders;
+      auto p = make_promise<std::size_t>();
+      asio::async_write_at(socket(),offset, asio::buffer(data.begin(), data.size()), std::bind(&process_write, p, _1, _2));
+      return p.QueryInterface<IFuture<std::size_t>>();
+    }
+};
+
+
 // NB: IGetImplementation returns socket
 struct ImplementTcp :implement_runtime_class<ImplementTcp, Tcp_t1>, 
   ImplementSocketHelper<ImplementTcp,asio::ip::tcp::socket,asio::ip::tcp>,
