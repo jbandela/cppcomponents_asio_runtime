@@ -3,6 +3,8 @@
 #include <cppcomponents_async_coroutine_wrapper/cppcomponents_resumable_await.hpp>
 #include <sstream>
 
+#include<gtest/gtest.h>
+
 
 void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStream> is,
   cppcomponents::awaiter await){
@@ -40,39 +42,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 
 }
 
-  void udp_client(cppcomponents::awaiter await) {
 
-
-    using namespace cppcomponents::asio_runtime;
-    Udp u;
-    u.OpenRaw(4);
-    await(u.ConnectQueryRaw(cppcomponents::cr_string("127.0.0.1"), "7000",0));
-    await(u.SendRaw("World", 0));
-    auto buf = await(u.ReceiveBufferRaw(0));
-    std::string s(buf.Begin(), buf.End());
-    auto b = (s == std::string("Hello World"));
-    //assert(true);
-
-    
-  }
-
-  void udp_server(cppcomponents::awaiter await){
-    using namespace cppcomponents::asio_runtime;
-      Udp u;
-      u.OpenRaw(4);
-      auto sip = IPAddress::V4Loopback().ToString();
-      u.Bind(endpoint(IPAddress::V4FromString("0.0.0.0"), 7000));
-
-      endpoint ep;
-      cppcomponents::use<cppcomponents::IBuffer> ib;
-      std::tie(ib, ep) = await(u.ReceiveFromBufferRaw(0));
-      std::string s(ib.Begin(), ib.End());
-      s = "Hello " + s;
-      await(u.SendToRaw(const_simple_buffer(&s[0], s.size()), ep, 0));
-      auto b = (s == "Hello World");
-      assert(s == "Hello World");
-
-  }
   void main_async(int i, cppcomponents::awaiter await){
 
     using namespace cppcomponents;
@@ -83,8 +53,6 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
     Runtime::GetBlockingThreadPool();
     
 
-    resumable(udp_server)();
-    resumable(udp_client)();
 
     auto eps = await(Tcp::Query("www.google.com", "https", ISocket::Passive | ISocket::AddressConfigured));
     std::vector<std::string> ipstrings;
@@ -94,7 +62,6 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
     auto start = std::chrono::steady_clock::now();
     auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ 50 }));
     auto end = std::chrono::steady_clock::now();
-    std::cout << "Timer finished with error code " << f.ErrorCode() << " after " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "milliseconds \n";
 #if 1
     TlsContext context{ TlsConstants::Method::Tlsv1 };
     context.LoadVerifyFile("C:\\Users\\jrb\\Desktop\\cacert.pem");
@@ -128,34 +95,66 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
     cppcomponents::async(cppcomponents::asio_runtime::Runtime::GetThreadPool(),std::bind(cppcomponents::resumable(print_connection),is.QueryInterface<IAsyncStream>()));
   }
 }
-#include <signal.h>
-int main(){
-  int i = 0;
-  //std::cout << "Enter wait time in milliseconds\n";
-  //std::cin >> i;
-  cppcomponents::resumable(main_async)(500).Then([](cppcomponents::Future<void> f){
-    std::cout << "Finished with " << f.ErrorCode() << "\n";
-  });
 
-  using namespace cppcomponents;
-  using namespace cppcomponents::asio_runtime;
-  SignalSet s;
-  s.Add(SIGINT);
-  std::atomic<bool> done{ false };
-  s.Wait().Then([&](Future<int> f){
-    if (f.ErrorCode()){
-      std::cout << "Signal error code " <<  f.ErrorCode() << std::endl;
-    }
-    else{
-      std::cout << "Signal received " << f.Get() << std::endl;
-    }
-    done.store(true);
-  });
-  while (!done.load()){
-    std::this_thread::yield();
+  
+  void udp_client(cppcomponents::awaiter await) {
+
+
+    using namespace cppcomponents::asio_runtime;
+    Udp u;
+    u.OpenRaw(4);
+    await(u.ConnectQueryRaw(cppcomponents::cr_string("127.0.0.1"), "7000", 0));
+    await(u.SendRaw("World", 0));
+    auto buf = await(u.ReceiveBufferRaw(0));
+    std::string s(buf.Begin(), buf.End());
+    EXPECT_EQ("Hello World", s);
+
+
   }
-  std::cin >> i;
 
-  //cppcomponents::asio_runtime::Runtime::GetThreadPool().Join();
+  void udp_server(cppcomponents::awaiter await){
+    using namespace cppcomponents::asio_runtime;
+    Udp u;
+    u.OpenRaw(4);
+    auto sip = IPAddress::V4Loopback().ToString();
+    u.Bind(endpoint(IPAddress::V4FromString("0.0.0.0"), 7000));
 
-}
+    endpoint ep;
+    cppcomponents::use<cppcomponents::IBuffer> ib;
+    std::tie(ib, ep) = await(u.ReceiveFromBufferRaw(0));
+    std::string s(ib.Begin(), ib.End());
+    s = "Hello " + s;
+    await(u.SendToRaw(const_simple_buffer(&s[0], s.size()), ep, 0));
+    EXPECT_EQ("Hello World", s);
+
+  }
+
+  TEST(udp, udp){
+
+    auto server_future = cppcomponents::resumable(udp_server)();
+    auto client_future = cppcomponents::resumable(udp_client)();
+
+    while (!(server_future.Ready() && client_future.Ready())){
+      std::this_thread::yield();
+    }
+
+  }
+
+  void timer_test(cppcomponents::awaiter await){
+    using cppcomponents::asio_runtime::Timer;
+    auto start = std::chrono::steady_clock::now();
+    auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ 50 }));
+    auto end = std::chrono::steady_clock::now();
+    EXPECT_EQ(0, f.ErrorCode());
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    EXPECT_LE(ms, 70);
+    EXPECT_GE(ms, 30);
+
+  }
+
+  TEST(timer, timer){
+    auto f = cppcomponents::resumable(timer_test)();
+    while (!f.Ready()){
+      std::this_thread::yield();
+    }
+  }
