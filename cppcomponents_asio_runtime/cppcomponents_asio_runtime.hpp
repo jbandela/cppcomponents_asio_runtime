@@ -1,3 +1,6 @@
+#pragma once
+#ifndef INCLUDE_GUARD_CPPCOMPONENTS_ASIO_RUNTIME_CPPCOMPONENTS_ASIO_RUNTIME_HPP_12_19_2013_
+#define INCLUDE_GUARD_CPPCOMPONENTS_ASIO_RUNTIME_CPPCOMPONENTS_ASIO_RUNTIME_HPP_12_19_2013_
 #include <cppcomponents/cppcomponents.hpp>
 #include <cppcomponents/future.hpp>
 #include <cppcomponents/buffer.hpp>
@@ -562,3 +565,4 @@ namespace cppcomponents{
 
 }
 
+#endif
