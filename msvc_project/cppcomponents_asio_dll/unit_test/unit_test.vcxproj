@@ -44,7 +44,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Users\jrb\Source\Repos\cppcomponents_asio_runtime\testing\external\googletest-read-only\include;C:\Users\jrb\Source\Repos\cppcomponents_asio_runtime\testing\external\googletest-read-only;$(IncludePath)</IncludePath>
+    <IncludePath>e:\Repos\cppcomponents_asio_runtime\testing\external\googletest-read-only\include;e:\Repos\cppcomponents_asio_runtime\testing\external\googletest-read-only;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
