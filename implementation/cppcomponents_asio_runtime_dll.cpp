@@ -441,7 +441,7 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
     return (io_service_.poll_one() != 0);
   }
   ImplementRuntime(std::int32_t signed_num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100)
-    :min_threads_{ min_threads }, max_threads_{max_threads}
+    :min_threads_{ min_threads<0?2:min_threads }, max_threads_{max_threads<0?100:max_threads}
   {
     std::uint32_t num_threads = 0;
     if (signed_num_threads == -1){

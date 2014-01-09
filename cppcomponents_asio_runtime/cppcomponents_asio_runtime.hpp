@@ -146,10 +146,10 @@ namespace cppcomponents{
       CPPCOMPONENTS_CONSTRUCT(IRuntimeStatics, GetThreadPoolRaw,GetBlockingThreadPoolRaw, GetLongRunningExecutorRaw);
 
       CPPCOMPONENTS_STATIC_INTERFACE_EXTRAS(IRuntimeStatics){
-        static use<IThreadPool> GetThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100){
+        static use<IThreadPool> GetThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = -1, std::int32_t max_threads = -1){
           return Class::GetThreadPoolRaw(num_threads, min_threads, max_threads);
         }
-		static use<IThreadPool> GetBlockingThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100){
+		static use<IThreadPool> GetBlockingThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = -1, std::int32_t max_threads = -1){
 			return Class::GetBlockingThreadPoolRaw(num_threads, min_threads, max_threads);
 		}
 		static use<IExecutor> GetLongRunningExecutor(std::int32_t num_threads = -1)
