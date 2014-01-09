@@ -301,6 +301,12 @@ namespace cross_compiler_interface{
 }
 
 namespace cppcomponents{
+
+	template<>
+	struct uuid_of<asio_runtime::endpoint>{
+		typedef cppcomponents::uuid<0x98b5434b, 0x8d8d, 0x4d2f, 0xb995, 0xd5c0148d9b59> uuid_type;
+	};
+
   namespace asio_runtime{
     struct IAsyncDatagram :define_interface<cppcomponents::uuid<0x5e1f8df2, 0x3485, 0x416a, 0x8024, 0x9f18f7ecad02>>
     {
