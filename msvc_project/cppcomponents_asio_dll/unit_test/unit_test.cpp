@@ -167,12 +167,23 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 	  auto e = Runtime::GetThreadPool();
 	  auto lr = Runtime::GetLongRunningExecutor();
 	  std::vector<Future<void>> v;
+	  Future<void> sf;
+	  std::atomic<bool> bfirst_lr{ false };
 	  for (int i = 0; i < 100; i++){
-		 v.push_back(cppcomponents::async(lr, [](){std::this_thread::sleep_for(std::chrono::milliseconds{ 900 }); }));
+		  v.push_back(cppcomponents::async(lr, [&bfirst_lr](){std::this_thread::sleep_for(std::chrono::milliseconds{ 100 }); bfirst_lr.store(true); }));
 	  }
-	  v.push_back(cppcomponents::async(e, [](){std::cout << "Another short task"; }));
+	  sf = cppcomponents::async(e, [](){ });
 	  auto f = cppcomponents::when_all(v);
 
+	  // wait until the short task finishes
+	  while (!sf.Ready()){
+		  std::this_thread::yield();
+	  }
+
+	  // Our short task should have finished before the first long running task
+	  EXPECT_FALSE(bfirst_lr.load());
+
+	  // Wait for long running to finish
 	  while (!f.Ready()){
 		  std::this_thread::yield();
 	  }
