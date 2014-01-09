@@ -116,29 +116,38 @@ namespace cppcomponents{
       void Join();
       bool PollOne();
       std::int32_t Poll();
+	  std::size_t GetThreadCount();
 
-      CPPCOMPONENTS_CONSTRUCT(IThreadPool, AddThread, RemoveThread, Join, PollOne, Poll);
+	  CPPCOMPONENTS_CONSTRUCT(IThreadPool, AddThread, RemoveThread, Join, PollOne, Poll, GetThreadCount);
     };
 
-    
+	struct ILongRunningExecutor : define_interface<cppcomponents::uuid<0x93e8d621, 0xd795, 0x4451, 0xbe3a, 0xe6b59a4895c2>,cppcomponents::IExecutor>{
+
+		CPPCOMPONENTS_CONSTRUCT_NO_METHODS(ILongRunningExecutor)
+	};
 
 
     struct IRuntimeStatics :define_interface<cppcomponents::uuid<0x64d84abd, 0x7333, 0x420b, 0x80ce, 0x9462c191afe7>>
     {
       use<IThreadPool> GetThreadPoolRaw(std::int32_t num_threads, std::int32_t min_threads, std::int32_t max_threads);
       use<IThreadPool> GetBlockingThreadPoolRaw(std::int32_t num_threads, std::int32_t min_threads, std::int32_t max_threads);
+	  use<IExecutor> GetLongRunningExecutorRaw(std::int32_t num_threads);
       //use <IIOService> GetIOService();
 
-      CPPCOMPONENTS_CONSTRUCT(IRuntimeStatics, GetThreadPoolRaw,GetBlockingThreadPoolRaw);
+      CPPCOMPONENTS_CONSTRUCT(IRuntimeStatics, GetThreadPoolRaw,GetBlockingThreadPoolRaw, GetLongRunningExecutorRaw);
 
       CPPCOMPONENTS_STATIC_INTERFACE_EXTRAS(IRuntimeStatics){
         static use<IThreadPool> GetThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100){
           return Class::GetThreadPoolRaw(num_threads, min_threads, max_threads);
         }
-        static use<IThreadPool> GetBlockingThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100){
-          return Class::GetBlockingThreadPoolRaw(num_threads, min_threads, max_threads);
-        }
-      };
+		static use<IThreadPool> GetBlockingThreadPool(std::int32_t num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100){
+			return Class::GetBlockingThreadPoolRaw(num_threads, min_threads, max_threads);
+		}
+		static use<IExecutor> GetLongRunningExecutor(std::int32_t num_threads = -1)
+		{
+			return Class::GetLongRunningExecutorRaw(num_threads);
+		}
+	  };
     };
 
     inline std::string RuntimeId(){ return "cppcomponents_asio_dll!Runtime"; }

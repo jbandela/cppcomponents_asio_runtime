@@ -287,6 +287,11 @@ struct ImplementBlockingThreadPool :implement_runtime_class<ImplementBlockingThr
     }
     return count;
   }
+
+  std::size_t GetThreadCount(){
+	  spin_locker l{ lock_ };
+	  return threads_.size();
+  }
   ImplementBlockingThreadPool(std::int32_t signed_num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100)
     :min_threads_{ min_threads }, max_threads_{ max_threads }
   {
@@ -303,6 +308,62 @@ struct ImplementBlockingThreadPool :implement_runtime_class<ImplementBlockingThr
   }
 
 };
+inline std::string LongRunningExecutorId(){ return "cppcomponents::uuid<0x1bc6abe2, 0x39a6, 0x4243, 0x9f6c, 0xcc78c4c868c8>"; }
+struct ImplementLongRunningExecutor :cppcomponents::implement_runtime_class<ImplementLongRunningExecutor,
+	cppcomponents::runtime_class<LongRunningExecutorId, cppcomponents::object_interfaces<ILongRunningExecutor>>>
+{
+	typedef cppcomponents::delegate < void() > ClosureType;
+
+	cppcomponents::Channel < cppcomponents::use<ClosureType> > chan_;
+
+	std::int32_t get_number_runners(std::int32_t num){
+		if (num > 0){ return num; }
+		auto concurrency = Runtime::GetThreadPool().GetThreadCount();
+		if (concurrency == 0 || concurrency == 1 || concurrency == 2){
+			return 1;
+		}
+		if (concurrency == 3){
+			return 2;
+		}
+		return (concurrency * 3) / 4;
+	}
+
+	static void runner(Channel<use<ClosureType>> chan,use<IThreadPool> pool){
+		chan.Read().Then(pool,[chan,pool](cppcomponents::Future<cppcomponents::use<ClosureType>> f)mutable{
+			auto func = f.Get();
+			assert(func);
+			try{
+				func();
+			}
+			catch (std::exception&){}
+
+			pool.Add(std::bind(&ImplementLongRunningExecutor::runner, chan,pool));
+
+		});
+	}
+	ImplementLongRunningExecutor(std::int32_t num_threads)
+		:chan_{ cppcomponents::make_channel<cppcomponents::use<ClosureType>>() }
+	{
+		auto pool = Runtime::GetThreadPool();
+		auto num = get_number_runners(num_threads);
+		for (int i = 0; i < num; ++i){
+			pool.Add(std::bind(&ImplementLongRunningExecutor::runner, chan_,pool));
+
+		}
+	}
+
+	void AddDelegate(use<ClosureType> f){
+		assert(f);
+		chan_.Write(f);
+	}
+	std::size_t NumPendingClosures(){
+		return 65536;
+	}
+
+};
+
+
+
 
 
 struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>{
@@ -352,6 +413,12 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
       return false;
     }
   }
+
+  std::size_t IThreadPool_GetThreadCount(){
+	  spin_locker l{ lock_ };
+	  return threads_.size();
+  }
+
 
   void IThreadPool_Join(){
     spin_locker l{ lock_ };
@@ -411,6 +478,13 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
 
   };
 
+  struct LongRunningExecutorInitializer{
+	  use<IExecutor> e_;
+	  LongRunningExecutorInitializer(std::int32_t num){
+		  e_ = ImplementLongRunningExecutor::create(num).QueryInterface<IExecutor>();
+	  }
+  };
+
   static   use<IThreadPool> GetThreadPoolRaw(std::int32_t num_threads, std::int32_t min_threads, std::int32_t max_threads){
     return cross_compiler_interface::detail::safe_static_init<TPInitializer, ImplementRuntime>::get(num_threads, min_threads, max_threads).pool_;
   }
@@ -418,7 +492,10 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
     return cross_compiler_interface::detail::safe_static_init<BlockingTPInitializer, ImplementRuntime>::get(num_threads, min_threads, max_threads).pool_;
   }
 
-  
+  static use<IExecutor> GetLongRunningExecutorRaw(std::int32_t num_threads){
+	  return cross_compiler_interface::detail::safe_static_init<LongRunningExecutorInitializer, ImplementRuntime>::get(num_threads).e_;
+  }
+
 
 
   void* GetImplementationRaw(){ return this; }
@@ -426,6 +503,7 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
 };
 
 CPPCOMPONENTS_REGISTER(ImplementRuntime)
+
 
 
 asio::io_service& get_io(){

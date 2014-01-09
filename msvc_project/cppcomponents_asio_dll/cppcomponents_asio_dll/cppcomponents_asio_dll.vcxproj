@@ -42,10 +42,10 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Users\jrb\Source\Repos\cppcomponents_asio_runtime\implementation\external_dependencies;C:\Users\jrb\Source\Repos\cppcomponents_asio_runtime\msvc_project\cppcomponents_asio_dll\packages\openssl.1.0.1.24\build\native\include;C:\Users\jrb\Source\Repos\cppcomponents_asio_runtime\msvc_project\cppcomponents_asio_dll\packages\openssl.1.0.1.24\build\native\include\v110\Win32\Debug\static;$(IncludePath)</IncludePath>
+    <IncludePath>c:\Repos\cppcomponents_asio_runtime\implementation\external_dependencies;C:\Repos\cppcomponents_asio_runtime\msvc_project\cppcomponents_asio_dll\packages\openssl.1.0.1.24\build\native\include;C:\Repos\cppcomponents_asio_runtime\msvc_project\cppcomponents_asio_dll\packages\openssl.1.0.1.24\build\native\include\v110\Win32\Debug\static;C:\Repos\cppcomponents_asio_runtime\implementation\external_dependencies;$(IncludePath)</IncludePath>
     <Linkage-zlib>static</Linkage-zlib>
     <Linkage-openssl>static</Linkage-openssl>
-    <LibraryPath>C:\Users\jrb\Source\Repos\cppcomponents_asio_runtime\msvc_project\cppcomponents_asio_dll\packages\zlib.1.2.8.6\build\native\lib\v110\Win32\Debug\static\cdecl;C:\Users\jrb\Source\Repos\cppcomponents_asio_runtime\msvc_project\cppcomponents_asio_dll\packages\openssl.1.0.1.24\build\native\lib\v110\Win32\Debug\static;$(LibraryPath)</LibraryPath>
+    <LibraryPath>C:\Repos\cppcomponents_asio_runtime\msvc_project\cppcomponents_asio_dll\packages\zlib.1.2.8.6\build\native\lib\v110\Win32\Debug\static\cdecl;C:\Repos\cppcomponents_asio_runtime\msvc_project\cppcomponents_asio_dll\packages\openssl.1.0.1.24\build\native\lib\v110\Win32\Debug\static;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>

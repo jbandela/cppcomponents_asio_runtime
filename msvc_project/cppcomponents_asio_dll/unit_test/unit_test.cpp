@@ -158,3 +158,23 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
       std::this_thread::yield();
     }
   }
+
+
+  TEST(longrunningexecutor, longrunningexecutor){
+	  using namespace cppcomponents;
+	  using namespace asio_runtime;
+
+	  auto e = Runtime::GetThreadPool();
+	  auto lr = Runtime::GetLongRunningExecutor();
+	  std::vector<Future<void>> v;
+	  for (int i = 0; i < 100; i++){
+		 v.push_back(cppcomponents::async(lr, [](){std::this_thread::sleep_for(std::chrono::milliseconds{ 900 }); }));
+	  }
+	  v.push_back(cppcomponents::async(e, [](){std::cout << "Another short task"; }));
+	  auto f = cppcomponents::when_all(v);
+
+	  while (!f.Ready()){
+		  std::this_thread::yield();
+	  }
+
+  } 
