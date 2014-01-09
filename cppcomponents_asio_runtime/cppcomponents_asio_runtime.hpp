@@ -88,6 +88,15 @@ namespace cross_compiler_interface{
 }
 
 namespace cppcomponents{
+	template<>
+	struct uuid_of<asio_runtime::simple_buffer>{
+		typedef cppcomponents::uuid<0xa198811e, 0x199f, 0x4b4a, 0xbac0, 0x9b3944d566ad> uuid_type;
+	};
+	template<>
+	struct uuid_of<asio_runtime::const_simple_buffer>{
+		typedef cppcomponents::uuid<0x6d3336ce, 0x24e3, 0x4922, 0xad21, 0xfb56d19bbef0> uuid_type;
+	};
+
   namespace asio_runtime{
 
 
@@ -301,10 +310,9 @@ namespace cross_compiler_interface{
 }
 
 namespace cppcomponents{
-
 	template<>
 	struct uuid_of<asio_runtime::endpoint>{
-		typedef cppcomponents::uuid<0x98b5434b, 0x8d8d, 0x4d2f, 0xb995, 0xd5c0148d9b59> uuid_type;
+		typedef cppcomponents::uuid<0x6ac33669, 0x0ea0, 0x4380, 0x8d20, 0x51d479e56711> uuid_type;
 	};
 
   namespace asio_runtime{
@@ -542,8 +550,6 @@ namespace cppcomponents{
       factory_interface<ITlsStreamCreator>> TlsStream_t;
     typedef use_runtime_class<TlsStream_t> TlsStream;
 
-  }
-
   // Support for Signal Sets
   struct ISignalSet :define_interface<cppcomponents::uuid<0xb1d72883, 0x05ab, 0x41b5, 0x8a44, 0x51e6090c0a3b>>
   {
@@ -559,21 +565,13 @@ namespace cppcomponents{
 
   inline std::string SignalSetId(){ return "cppcomponents_asio_dll!SignalSet"; }
   typedef runtime_class<SignalSetId, object_interfaces<ISignalSet>> SignalSet_t;
-  typedef use_runtime_class<SignalSet_t> SignalSet;
+  typedef use_runtime_class<SignalSet_t> SignalSet;  
+
+}
 
 
-  template<>
-  struct uuid_of<asio_runtime::simple_buffer>{
-    typedef cppcomponents::uuid<0xa198811e, 0x199f, 0x4b4a, 0xbac0, 0x9b3944d566ad> uuid_type;
-  };
-  template<>
-  struct uuid_of<asio_runtime::const_simple_buffer>{
-    typedef cppcomponents::uuid<0x6d3336ce, 0x24e3, 0x4922, 0xad21, 0xfb56d19bbef0> uuid_type;
-  };
-  template<>
-  struct uuid_of<asio_runtime::endpoint>{
-    typedef cppcomponents::uuid<0x6ac33669, 0x0ea0, 0x4380, 0x8d20, 0x51d479e56711> uuid_type;
-  };
+
+
 
 
 
