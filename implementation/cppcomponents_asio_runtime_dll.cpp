@@ -1038,7 +1038,7 @@ struct ImplementAsyncStreamHelper{
     return p.QueryInterface<IFuture<std::size_t>>();
   }
   Future<std::size_t> IAsyncStream_ReadAt(std::uint64_t offset, simple_buffer buf){
-    return IAsyncStream_Read(buf);
+    return IAsyncStream_ReadRaw(buf);
   }
 
   Future<std::size_t> IAsyncStream_ReadExactly(simple_buffer buf, std::size_t len){
