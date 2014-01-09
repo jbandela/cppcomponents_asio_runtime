@@ -1123,7 +1123,7 @@ struct ImplementAsyncStreamHelper{
   }
 
   Future<std::size_t> IAsyncStream_WriteAt(std::uint64_t offset, const_simple_buffer data){
-    return IAsyncStream_Write(data);
+    return IAsyncStream_WriteRaw(data);
   }
 };
 
@@ -1395,7 +1395,7 @@ struct ImplementTlsLowestLevel :implement_runtime_class<ImplementTlsLowestLevel,
 
 
   template<class T>
-  ImplementTlsLowestLevel(T& parent) :socket_{ parent.socket_.next_layer() }, parent_{ parent.template QueryInterface<InterfaceUnknown>() }{}
+  ImplementTlsLowestLevel(T& parent) :socket_( parent.socket_.next_layer() ), parent_( parent.template QueryInterface<InterfaceUnknown>() ){}
   void* IGetImplementation_GetImplementationRaw(){
     return &socket_;
   }
