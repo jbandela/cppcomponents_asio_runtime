@@ -1323,7 +1323,7 @@ struct ImplementUdp:implement_runtime_class<ImplementUdp,Udp_t>,
     }
   }
 
-  static const int max_udp_size = 65507;
+  enum{ max_udp_size = 65507 };
 
   Future<use<IBuffer>> IAsyncDatagram_ReceiveBufferRaw(std::uint32_t flags){
     auto p = make_promise<use<IBuffer>>();
