@@ -131,8 +131,9 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 
   TEST(udp, udp){
 
-    auto server_future = cppcomponents::resumable(udp_server)();
-    auto client_future = cppcomponents::resumable(udp_client)();
+	auto e = cppcomponents::asio_runtime::Runtime::GetThreadPool();
+    auto server_future = cppcomponents::async(e,cppcomponents::resumable(udp_server));
+    auto client_future = cppcomponents::async(e,cppcomponents::resumable(udp_client));
 
     while (!(server_future.Ready() && client_future.Ready())){
       std::this_thread::yield();
@@ -141,6 +142,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
   }
 
   void timer_test(cppcomponents::awaiter await){
+
     using cppcomponents::asio_runtime::Timer;
     auto start = std::chrono::steady_clock::now();
     auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ 50 }));
@@ -153,7 +155,9 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
   }
 
   TEST(timer, timer){
-    auto f = cppcomponents::resumable(timer_test)();
+	auto e = cppcomponents::asio_runtime::Runtime::GetThreadPool();
+
+    auto f = cppcomponents::async(e,cppcomponents::resumable(timer_test));
     while (!f.Ready()){
       std::this_thread::yield();
     }
