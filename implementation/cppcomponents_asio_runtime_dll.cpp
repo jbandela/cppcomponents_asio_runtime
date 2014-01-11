@@ -51,7 +51,8 @@ struct io_service_runner{
 
   struct coarse_runner{
     static bool run(asio::io_service* io){
-      return (0 != io->poll());
+		io->run();
+		return false;
     }
   };
   struct fine_runner{
@@ -374,6 +375,7 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
   std::uint32_t max_threads_;
   std::uint32_t initial_threads_;
   typedef cppcomponents::delegate < void() > ClosureType;
+  std::unique_ptr<asio::io_service::work> w_;
 
   asio::io_service& io(){ return io_service_; }
 
@@ -404,8 +406,9 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
     }
   }
   bool IThreadPool_RemoveThread(){
+
     spin_locker l{ lock_ };
-    if (threads_.size() > min_threads_){
+    if (threads_.size() > initial_threads_){
       threads_.pop_back();
       return true;
     }
@@ -422,7 +425,7 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
 
   void IThreadPool_Join(){
     spin_locker l{ lock_ };
-    
+	w_.reset(nullptr);
     // Wait for tasks to finish
     for (auto& t : threads_){
       t->join_when_no_work();
@@ -441,7 +444,7 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
     return (io_service_.poll_one() != 0);
   }
   ImplementRuntime(std::int32_t signed_num_threads = -1, std::int32_t min_threads = 2, std::int32_t max_threads = 100)
-    :min_threads_{ min_threads<0?2:min_threads }, max_threads_{max_threads<0?100:max_threads}
+	  :min_threads_{ min_threads < 0 ? 2 : min_threads }, max_threads_{ max_threads < 0 ? 100 : max_threads }, w_{ new asio::io_service::work{io_service_} }
   {
     std::uint32_t num_threads = 0;
     if (signed_num_threads == -1){
