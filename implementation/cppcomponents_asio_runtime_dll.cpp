@@ -742,8 +742,9 @@ template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelp
       socket().assign(UdpOrTcp::v6(), static_cast<asio::detail::socket_type>(s));
 
     }
-
-    throw error_invalid_arg();
+	else{
+		throw error_invalid_arg();
+	}
   }
 
   Future<void> Connect(endpoint e){
