@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cppcomponents_async_coroutine_wrapper/cppcomponents_resumable_await.hpp>
 #include <sstream>
+#include <cppcomponents/loop_executor.hpp>
 
 #include<gtest/gtest.h>
 
@@ -197,6 +198,8 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 	  using namespace cppcomponents;
 	  using namespace asio_runtime;
 
+	  cppcomponents::LoopExecutor loop;
+
 	  auto e = Runtime::GetBlockingThreadPool();
 	  std::vector<Future<void>> v;
 	  Future<void> sf;
@@ -207,16 +210,16 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 	  }
 	  auto f = cppcomponents::when_all(v);
 
-	  // Wait for long running to finish
-	  while (!f.Ready()){
-		  std::this_thread::yield();
-	  }
+	  f.Then([&loop](Future<void> f){loop.MakeLoopExit(); });
+
+	  loop.Loop(); 
 
 	  auto stop = std::chrono::steady_clock::now();
 
 	  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-	   EXPECT_LT(duration.count(), 2 * 1000);
+	  EXPECT_LT(duration.count(), 2 * 1000);
 
+	   
 
 
 
