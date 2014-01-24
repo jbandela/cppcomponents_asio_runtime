@@ -95,7 +95,7 @@ struct io_service_runner{
 
   void join_when_no_work(){
     stop_when_no_work();
-    if(t_.joinable()) t_.join();
+    if((t_.get_id() != std::this_thread::get_id()) && t_.joinable()) t_.join();
   }
 
     ~io_service_runner(){
@@ -103,7 +103,7 @@ struct io_service_runner{
     should_stop_.store(true);
 
     // Wait for the thread to stop
-    if(t_.joinable()) t_.join();
+	if ((t_.get_id() != std::this_thread::get_id()) && t_.joinable()) t_.join();
   }
 
 
@@ -185,11 +185,11 @@ struct blocking_thread_pool_runner{
 
   void join_when_no_work(){
     stop_when_no_work();
-    if (t_.joinable()) t_.join();
+	if ((t_.get_id() != std::this_thread::get_id()) && t_.joinable()) t_.join();
   }
 
   void join(){
-    if (t_.joinable()) t_.join();
+	  if ((t_.get_id() != std::this_thread::get_id()) && t_.joinable()) t_.join();
   }
 
   ~blocking_thread_pool_runner(){
@@ -197,7 +197,7 @@ struct blocking_thread_pool_runner{
     pcvar_->notify_all();
 
     // Wait for the thread to stop
-    if (t_.joinable()) t_.join();
+	if ((t_.get_id() != std::this_thread::get_id()) && t_.joinable()) t_.join();
   }
 
 
@@ -461,7 +461,7 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
   }
 
   ~ImplementRuntime(){
-    IThreadPool_Join();
+	  IThreadPool_Join();
   }
 
   struct TPInitializer{
