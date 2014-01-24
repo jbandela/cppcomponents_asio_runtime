@@ -193,3 +193,31 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 	  }
 
   } 
+  TEST(blockingthreadpool, blockingthreadpool){
+	  using namespace cppcomponents;
+	  using namespace asio_runtime;
+
+	  auto e = Runtime::GetBlockingThreadPool();
+	  std::vector<Future<void>> v;
+	  Future<void> sf;
+	  auto tc = e.GetThreadCount();
+	  auto start = std::chrono::steady_clock::now();
+	  for (int i = 0; i < tc; i++){
+		  v.push_back(cppcomponents::async(e, [](){std::this_thread::sleep_for(std::chrono::milliseconds{ 1000 });  }));
+	  }
+	  auto f = cppcomponents::when_all(v);
+
+	  // Wait for long running to finish
+	  while (!f.Ready()){
+		  std::this_thread::yield();
+	  }
+
+	  auto stop = std::chrono::steady_clock::now();
+
+	  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+	   EXPECT_LT(duration.count(), 2 * 1000);
+
+
+
+
+  } 
