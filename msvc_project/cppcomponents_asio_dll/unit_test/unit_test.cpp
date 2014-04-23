@@ -63,29 +63,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
     auto start = std::chrono::steady_clock::now();
     auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ 50 }));
     auto end = std::chrono::steady_clock::now();
-#if 1
-    TlsContext context{ TlsConstants::Method::Tlsv1 };
-    context.LoadVerifyFile("C:\\Users\\jrb\\Desktop\\cacert.pem");
-    context.SetVerifyMode(TlsConstants::VerifyPeer);
-    context.EnableRfc2818Verification("www.google.com");
-    TlsStream socket{ context.as<ITlsContext>() };
-  
 
-  await(socket.LowestLayer().ConnectQueryRaw("www.google.com", "https", ISocket::Passive | ISocket::AddressConfigured));
-  await(socket.Handshake(TlsConstants::HandshakeType::Client));
-  std::string resource = "/";
-  std::string server = "www.google.com";
-  std::string request = "GET " + resource + " HTTP/1.0\r\nHost: " + server + "\r\n\r\n";
-  await(socket.WriteRaw(const_simple_buffer(&request[0], request.size())));
-  while (true){
-   
-    auto fut = await.as_future(socket.ReadBuffer());
-    if (fut.ErrorCode()){ break; }
-    auto buf = fut.Get();
-    std::string str{ buf.Begin(), buf.End() };
-    std::cout << str;
-  }
-#endif 
   TcpAcceptor acceptor{ endpoint{ IPAddress::V4Loopback(), 7777 } };
 
   while (true){
