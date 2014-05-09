@@ -1,19 +1,18 @@
 #include "../../../cppcomponents_asio_runtime/cppcomponents_asio_runtime.hpp"
 #include <iostream>
-#include <cppcomponents_async_coroutine_wrapper/cppcomponents_resumable_await.hpp>
+#include <cppcomponents_concurrency/await.hpp>
 #include <sstream>
 #include <cppcomponents/loop_executor.hpp>
 
 #include<gtest/gtest.h>
 
 
-void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStream> is,
-  cppcomponents::awaiter await){
+void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStream> is){
   int loop = 0;
   while (true){
   std::string str;
     loop++;
-    auto fut = await.as_future(is.ReadBufferUntilString("\r\n\r\n"));
+    auto fut = cppcomponents::await_as_future(is.ReadBufferUntilString("\r\n\r\n"));
     if (fut.ErrorCode()){
       auto e = fut.ErrorCode();
       break;
@@ -34,7 +33,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
     strstream << "\r\n\r\n";
 
     auto s = strstream.str();
-    await(is.WriteRaw(cppcomponents::asio_runtime::const_simple_buffer{ &s[0], s.size() }));
+    cppcomponents::await(is.WriteRaw(cppcomponents::asio_runtime::const_simple_buffer{ &s[0], s.size() }));
   }
 
 
@@ -44,7 +43,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 }
 
 
-  void main_async(int i, cppcomponents::awaiter await){
+  void main_async(int i){
 
     using namespace cppcomponents;
     using namespace asio_runtime;
@@ -61,7 +60,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
       ipstrings.push_back(e.address_.ToString());
     }
     auto start = std::chrono::steady_clock::now();
-    auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ 50 }));
+    auto f = await_as_future(Timer::WaitFor(std::chrono::milliseconds{ 50 }));
     auto end = std::chrono::steady_clock::now();
 
   TcpAcceptor acceptor{ endpoint{ IPAddress::V4Loopback(), 7777 } };
@@ -71,19 +70,20 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
     auto is = t.as<ISocket>();
     await(acceptor.Accept(is));
     std::cout << "Received connect\n";
-    cppcomponents::async(cppcomponents::asio_runtime::Runtime::GetThreadPool(),std::bind(cppcomponents::resumable(print_connection),is.QueryInterface<IAsyncStream>()));
+    cppcomponents::co_async(cppcomponents::asio_runtime::Runtime::GetThreadPool(),std::bind(print_connection,is.QueryInterface<IAsyncStream>()));
   }
 }
 
   
-  void udp_client(cppcomponents::awaiter await) {
+  void udp_client() {
 
 
     using namespace cppcomponents::asio_runtime;
+	using cppcomponents::await;
     Udp u;
     u.OpenRaw(4);
-    await(u.ConnectQueryRaw(cppcomponents::cr_string("127.0.0.1"), "7000", 0));
-    await(u.SendRaw("World", 0));
+    cppcomponents::await(u.ConnectQueryRaw(cppcomponents::string_ref("127.0.0.1"), "7000", 0));
+    cppcomponents::await(u.SendRaw("World", 0));
     auto buf = await(u.ReceiveBufferRaw(0));
     std::string s(buf.Begin(), buf.End());
     EXPECT_EQ("Hello World", s);
@@ -91,8 +91,9 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 
   }
 
-  void udp_server(cppcomponents::awaiter await){
+  void udp_server(){
     using namespace cppcomponents::asio_runtime;
+	using cppcomponents::await;
     Udp u;
     u.OpenRaw(4);
     auto sip = IPAddress::V4Loopback().ToString();
@@ -111,20 +112,22 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
   TEST(udp, udp){
 
 	auto e = cppcomponents::asio_runtime::Runtime::GetThreadPool();
-    auto server_future = cppcomponents::async(e,cppcomponents::resumable(udp_server));
-    auto client_future = cppcomponents::async(e,cppcomponents::resumable(udp_client));
+    auto server_future = cppcomponents::co_async(e,udp_server);
+    auto client_future = cppcomponents::co_async(e,udp_client);
 
     while (!(server_future.Ready() && client_future.Ready())){
       std::this_thread::yield();
     }
-
+	server_future.Get();
+	client_future.Get();
   }
 
-  void timer_test(cppcomponents::awaiter await){
-
+  void timer_test(){
+	using cppcomponents::await;
+	using cppcomponents::await_as_future;
     using cppcomponents::asio_runtime::Timer;
     auto start = std::chrono::steady_clock::now();
-    auto f = await.as_future(Timer::WaitFor(std::chrono::milliseconds{ 50 }));
+    auto f = await_as_future(Timer::WaitFor(std::chrono::milliseconds{ 50 }));
     auto end = std::chrono::steady_clock::now();
     EXPECT_EQ(0, f.ErrorCode());
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -136,10 +139,11 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
   TEST(timer, timer){
 	auto e = cppcomponents::asio_runtime::Runtime::GetThreadPool();
 
-    auto f = cppcomponents::async(e,cppcomponents::resumable(timer_test));
+    auto f = cppcomponents::co_async(e,timer_test);
     while (!f.Ready()){
       std::this_thread::yield();
     }
+	f.Get();
   }
 
 
@@ -162,6 +166,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 	  while (!sf.Ready()){
 		  std::this_thread::yield();
 	  }
+	  sf.Get();
 
 	  // Our short task should have finished before the first long running task
 	  EXPECT_FALSE(bfirst_lr.load());
@@ -170,6 +175,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 	  while (!f.Ready()){
 		  std::this_thread::yield();
 	  }
+	  f.Get();
 
   } 
   TEST(blockingthreadpool, blockingthreadpool){
@@ -183,7 +189,7 @@ void print_connection(cppcomponents::use<cppcomponents::asio_runtime::IAsyncStre
 	  Future<void> sf;
 	  auto tc = e.GetThreadCount();
 	  auto start = std::chrono::steady_clock::now();
-	  for (int i = 0; i < tc; i++){
+	  for (unsigned int i = 0; i < tc; i++){
 		  v.push_back(cppcomponents::async(e, [](){std::this_thread::sleep_for(std::chrono::milliseconds{ 1000 });  }));
 	  }
 	  auto f = cppcomponents::when_all(v);

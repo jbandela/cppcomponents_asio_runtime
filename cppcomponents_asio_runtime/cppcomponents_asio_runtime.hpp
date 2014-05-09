@@ -159,12 +159,12 @@ namespace cppcomponents{
 	  };
     };
 
-    inline std::string RuntimeId(){ return "cppcomponents_asio_dll!Runtime"; }
+    inline const char* RuntimeId(){ return "cppcomponents_asio_dll!Runtime"; }
 
     typedef runtime_class<RuntimeId, factory_interface<NoConstructorFactoryInterface>, static_interfaces<IRuntimeStatics> > Runtime_t;
     typedef use_runtime_class<Runtime_t> Runtime;
 
-    inline std::string StrandId(){ return "cppcomponents_asio_dll!Strand"; }
+    inline const char* StrandId(){ return "cppcomponents_asio_dll!Strand"; }
 
     typedef runtime_class<StrandId, object_interfaces<IExecutor>> Strand_t;
     typedef use_runtime_class<Strand_t> Strand;
@@ -190,8 +190,8 @@ namespace cppcomponents{
 
       Future<use<IBuffer>> ReadBuffer();
       Future<use<IBuffer>> ReadBufferUntilChar(char c);
-      Future<use<IBuffer>> ReadBufferUntilString(cr_string delim);
-      Future<use<IBuffer>> ReadBufferUntilRegex(cr_string regex);
+      Future<use<IBuffer>> ReadBufferUntilString(string_ref delim);
+      Future<use<IBuffer>> ReadBufferUntilRegex(string_ref regex);
       Future<use<IBuffer>> ReadBufferExactly(std::size_t len);
 
 
@@ -234,13 +234,13 @@ namespace cppcomponents{
     };
 
     struct IIPAddressStatic :define_interface<cppcomponents::uuid<0xa4969be1, 0xb3cb, 0x41b3, 0xacea, 0x2074dbe8dfde>>{
-      use<IIPAddress> V4FromString(cr_string str);
+      use<IIPAddress> V4FromString(string_ref str);
       use<IIPAddress> V4FromBytes(simple_buffer bytes);
       use<IIPAddress> V4Broadcast();
       use<IIPAddress> V4Loopback();
       use<IIPAddress> V4Any();
 
-      use<IIPAddress> V6FromString(cr_string str);
+      use<IIPAddress> V6FromString(string_ref str);
       use<IIPAddress> V6FromBytes(simple_buffer bytes);
       use<IIPAddress> V6Loopback();
       use<IIPAddress> V6Any();
@@ -251,7 +251,7 @@ namespace cppcomponents{
 
     };
 
-    inline std::string IPAddressId(){ return "cppcomponents_asio_dll!IPAddress"; }
+    inline const char* IPAddressId(){ return "cppcomponents_asio_dll!IPAddress"; }
     typedef runtime_class < IPAddressId, object_interfaces<IIPAddress>, static_interfaces<IIPAddressStatic>,
       factory_interface < NoConstructorFactoryInterface >> IPAddress_t;
     typedef use_runtime_class<IPAddress_t> IPAddress;
@@ -354,7 +354,7 @@ namespace cppcomponents{
       };
       void AssignRaw(std::int32_t ip_type,std::uint64_t);
       Future<void> Connect(endpoint e);
-      Future<void> ConnectQueryRaw(cr_string host, cr_string service, std::uint32_t flags);
+      Future<void> ConnectQueryRaw(string_ref host, string_ref service, std::uint32_t flags);
       bool AtMark();
       std::size_t Available();
       void Bind(endpoint e);
@@ -385,7 +385,7 @@ namespace cppcomponents{
 
     struct IQueryStatic :define_interface<cppcomponents::uuid<0x9a57a9c7, 0xf3e6, 0x423b, 0xafcb, 0xf4b9440f04f5>>
     {
-      Future<std::vector<endpoint>> Query(cr_string host, cr_string service, std::uint32_t flags);
+      Future<std::vector<endpoint>> Query(string_ref host, string_ref service, std::uint32_t flags);
       CPPCOMPONENTS_CONSTRUCT(IQueryStatic, Query);
     };
 
@@ -422,7 +422,7 @@ namespace cppcomponents{
       };
     };
 
-    inline std::string TimerId(){ return "cppcomponents_asio_dll!Timer"; }
+    inline const char* TimerId(){ return "cppcomponents_asio_dll!Timer"; }
 
     typedef runtime_class<TimerId, object_interfaces<ITimer>, static_interfaces<ITimerStatics>> Timer_t;
     typedef use_runtime_class<Timer_t> Timer;
@@ -447,12 +447,12 @@ namespace cppcomponents{
       };
     };
 
-    inline std::string TcpAcceptorId(){ return "cppcomponents_asio_dll!TcpAcceptor"; }
+    inline const char* TcpAcceptorId(){ return "cppcomponents_asio_dll!TcpAcceptor"; }
     typedef runtime_class<TcpAcceptorId, object_interfaces<IAcceptor>, factory_interface<IAcceptorCreator>> TcpAcceptor_t;
     typedef use_runtime_class<TcpAcceptor_t> TcpAcceptor;
 
-    inline std::string TcpId(){ return "cppcomponents_asio_dll!Tcp"; }
-    inline std::string UdpId(){ return "cppcomponents_asio_dll!Udp"; }
+    inline const char* TcpId(){ return "cppcomponents_asio_dll!Tcp"; }
+    inline const char* UdpId(){ return "cppcomponents_asio_dll!Udp"; }
 
     typedef runtime_class<TcpId, object_interfaces<ISocket, IAsyncStream>, static_interfaces<IQueryStatic>> Tcp_t;
     typedef use_runtime_class<Tcp_t> Tcp;
@@ -474,7 +474,7 @@ namespace cppcomponents{
 
   };
 
-  inline std::string SignalSetId(){ return "cppcomponents_asio_dll!SignalSet"; }
+  inline const char* SignalSetId(){ return "cppcomponents_asio_dll!SignalSet"; }
   typedef runtime_class<SignalSetId, object_interfaces<ISignalSet>> SignalSet_t;
   typedef use_runtime_class<SignalSet_t> SignalSet;  
 

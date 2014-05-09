@@ -203,7 +203,7 @@ struct blocking_thread_pool_runner{
 
 };
 
-inline std::string BlockingThreadPoolId(){ return "cppcomponents_asio_dll!BlockingThreadPoolId"; }
+inline const char* BlockingThreadPoolId(){ return "cppcomponents_asio_dll!BlockingThreadPoolId"; }
 typedef runtime_class<BlockingThreadPoolId, factory_interface<NoConstructorFactoryInterface>, object_interfaces<IThreadPool> > BlockingThreadPool_t;
 
 struct ImplementBlockingThreadPool :implement_runtime_class<ImplementBlockingThreadPool, BlockingThreadPool_t>
@@ -309,7 +309,7 @@ struct ImplementBlockingThreadPool :implement_runtime_class<ImplementBlockingThr
   }
 
 };
-inline std::string LongRunningExecutorId(){ return "cppcomponents::uuid<0x1bc6abe2, 0x39a6, 0x4243, 0x9f6c, 0xcc78c4c868c8>"; }
+inline const char* LongRunningExecutorId(){ return "cppcomponents::uuid<0x1bc6abe2, 0x39a6, 0x4243, 0x9f6c, 0xcc78c4c868c8>"; }
 struct ImplementLongRunningExecutor :cppcomponents::implement_runtime_class<ImplementLongRunningExecutor,
 	cppcomponents::runtime_class<LongRunningExecutorId, cppcomponents::object_interfaces<ILongRunningExecutor>>>
 {
@@ -614,7 +614,7 @@ struct ImplementIPAddress :implement_runtime_class<ImplementIPAddress, IPAddress
   ImplementIPAddress(){}
   ImplementIPAddress(asio::ip::address a) :address_{std::move(a)}{}
 
-  static use<IIPAddress> V4FromString(cr_string str){
+  static use<IIPAddress> V4FromString(string_ref str){
     return ImplementIPAddress::create(asio::ip::address_v4::from_string(std::string(str.begin(), str.end()))).QueryInterface<IIPAddress>();
   }
   static use<IIPAddress> V4FromBytes(simple_buffer bytes){
@@ -637,7 +637,7 @@ struct ImplementIPAddress :implement_runtime_class<ImplementIPAddress, IPAddress
 
   }
 
-  static use<IIPAddress> V6FromString(cr_string str){
+  static use<IIPAddress> V6FromString(string_ref str){
     return ImplementIPAddress::create(asio::ip::address_v6::from_string(std::string(str.begin(), str.end()))).QueryInterface<IIPAddress>();
   }
   static use<IIPAddress> V6FromBytes(simple_buffer bytes){
@@ -764,7 +764,7 @@ template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelp
     return p.QueryInterface<IFuture<void>>();
   }
 
-  static  Future<std::vector<endpoint>> Query(cr_string host, cr_string service, std::uint32_t flags){
+  static  Future<std::vector<endpoint>> Query(string_ref host, string_ref service, std::uint32_t flags){
     typename UdpOrTcp::resolver::query::flags f{};
     if (flags & ISocket::AddressConfigured){
       f &= UdpOrTcp::resolver::query::flags::address_configured;
@@ -809,7 +809,7 @@ template<class Derived, class Socket, class UdpOrTcp> struct ImplementSocketHelp
     return p.QueryInterface<IFuture<std::vector<endpoint>>>();
   }
 
-  Future<void> ConnectQueryRaw(cr_string host, cr_string service, std::uint32_t flags){
+  Future<void> ConnectQueryRaw(string_ref host, string_ref service, std::uint32_t flags){
     typename UdpOrTcp::resolver::query::flags f{};
     if (flags & ISocket::AddressConfigured){
       f &= UdpOrTcp::resolver::query::flags::address_configured;
@@ -1072,7 +1072,7 @@ struct ImplementAsyncStreamHelper{
     return p.QueryInterface<IFuture<use<IBuffer>>>();
 
   }
-  Future<use<IBuffer>> IAsyncStream_ReadBufferUntilString(cr_string delim){
+  Future<use<IBuffer>> IAsyncStream_ReadBufferUntilString(string_ref delim){
     auto p = make_promise<use<IBuffer>>();
     std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
 
@@ -1080,7 +1080,7 @@ struct ImplementAsyncStreamHelper{
     return p.QueryInterface<IFuture<use<IBuffer>>>();
 
   }
-  Future<use<IBuffer>> IAsyncStream_ReadBufferUntilRegex(cr_string regex){
+  Future<use<IBuffer>> IAsyncStream_ReadBufferUntilRegex(string_ref regex){
     auto p = make_promise<use<IBuffer>>();
     std::shared_ptr<asio::streambuf> spbuf = std::make_shared<asio::streambuf>();
 
