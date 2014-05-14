@@ -44,7 +44,7 @@ namespace cppcomponents{
       template<std::size_t sz>
       basic_simple_buffer(std::array<Char, sz>&ar)
         : data_{ &ar[0] },
-        len_{ size }
+        len_{ sz }
       {}
       template<std::size_t sz>
       basic_simple_buffer(std::array<UChar, sz>&ar)
