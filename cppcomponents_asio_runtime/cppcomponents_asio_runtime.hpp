@@ -74,16 +74,16 @@ namespace cppcomponents{
   }
 }
 
-namespace cross_compiler_interface{
+namespace cppcomponents{
 
   template<class Char>
   struct cross_conversion<cppcomponents::asio_runtime::basic_simple_buffer<Char>>
     :trivial_conversion<cppcomponents::asio_runtime::basic_simple_buffer<Char>>{};
-  template<class Char>
+  /*template<class Char>
   struct type_name_getter<cppcomponents::asio_runtime::basic_simple_buffer<Char>>
   {
     static std::string get_type_name(){ return "cppcomponents::asio_runtime::basic_simple_buffer"; }
-  };
+  };*/
 
 }
 
@@ -268,7 +268,7 @@ namespace cppcomponents{
     namespace detail{
 #pragma pack(push, 1)
       struct end_point_trivial{
-        cross_compiler_interface::cross_conversion<use<IIPAddress>>::converted_type caddress_;
+        cppcomponents::cross_conversion<use<IIPAddress>>::converted_type caddress_;
         std::int32_t port_;
       };
 #pragma pack(pop)
@@ -277,14 +277,10 @@ namespace cppcomponents{
   }
 }
 
-namespace cross_compiler_interface{
+namespace cppcomponents{
 
 
-  template<>
-  struct type_name_getter<cppcomponents::asio_runtime::endpoint>
-  {
-    static std::string get_type_name(){ return "cppcomponents::asio_runtime::endpoint"; }
-  };
+
 
   template<>
   struct cross_conversion<cppcomponents::asio_runtime::endpoint>{

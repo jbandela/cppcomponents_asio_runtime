@@ -489,14 +489,14 @@ struct ImplementRuntime :implement_runtime_class<ImplementRuntime, RuntimeImp_t>
   };
 
   static   use<IThreadPool> GetThreadPoolRaw(std::int32_t num_threads, std::int32_t min_threads, std::int32_t max_threads){
-    return cross_compiler_interface::detail::safe_static_init<TPInitializer, ImplementRuntime>::get(num_threads, min_threads, max_threads).pool_;
+    return cppcomponents::detail::safe_static_init<TPInitializer, ImplementRuntime>::get(num_threads, min_threads, max_threads).pool_;
   }
   static   use<IThreadPool> GetBlockingThreadPoolRaw(std::int32_t num_threads, std::int32_t min_threads, std::int32_t max_threads){
-    return cross_compiler_interface::detail::safe_static_init<BlockingTPInitializer, ImplementRuntime>::get(num_threads, min_threads, max_threads).pool_;
+    return cppcomponents::detail::safe_static_init<BlockingTPInitializer, ImplementRuntime>::get(num_threads, min_threads, max_threads).pool_;
   }
 
   static use<IExecutor> GetLongRunningExecutorRaw(std::int32_t num_threads){
-	  return cross_compiler_interface::detail::safe_static_init<LongRunningExecutorInitializer, ImplementRuntime>::get(num_threads).e_;
+	  return cppcomponents::detail::safe_static_init<LongRunningExecutorInitializer, ImplementRuntime>::get(num_threads).e_;
   }
 
 
